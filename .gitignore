@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+settings.json
+smtp.json
+users.json
+*.sqlite3*
+*.db
+*.tar.gz
+*.log
+.DS_Store

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>Outline Admin · VPN administration</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/sharing.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+{% if preview %}<div class="notice" role="status">LOCAL PREVIEW · Sample data only. This is not connected to your LXC.</div>{% endif %}
+<section id="login" class="login-shell" hidden>
+  <div class="login-card"><div class="brand-mark">O<span>•</span></div><p class="eyebrow">OUTLINE ADMIN / PRIVATE NETWORK</p>
+  <h1>Your network.<br>Your control.</h1><p class="muted">Sign in to manage access and monitor usage.</p>
+  <form id="login-form"><label>Username<input name="username" autocomplete="username" value="admin" required></label>
+  <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+  <button class="primary" type="submit">Sign in <span>↗</span></button><p id="login-error" role="alert"></p></form>
+  <small>Private administration · Outline Admin</small></div>
+</section>
+<div id="dashboard" class="shell" hidden>
+  <aside><a class="brand" href="/">OUTLINE<span>ADMIN</span><i>•</i></a>
+    <div class="workspace"><div class="workspace-icon">O</div><div>Private network<small>Network administration</small></div></div>
+    <p class="nav-label">WORKSPACE</p><a class="nav active" href="#overview">◈ <span>Overview</span></a>
+    <a class="nav" href="#access">⌘ <span>Access management</span></a><a class="nav" href="#activity">◷ <span>Admin activity</span></a>
+    <div class="sidebar-bottom"><div class="mini-status"><span class="dot"></span> Self-hosted on your LXC</div><p id="domain"></p><button id="logout" class="logout">Sign out ↗</button></div>
+  </aside>
+  <main id="overview"><header><div><p class="eyebrow">NETWORK / OVERVIEW</p><h1>Network overview<span class="title-dot">.</span></h1><p class="muted">Your people. Your traffic. Your private network.</p></div>
+    <div class="header-actions"><span id="health" class="pill">Checking metrics…</span><button id="refresh-now" class="text-button" aria-label="Refresh dashboard">↻ Refresh</button><button id="open-add" class="primary">＋ Create access</button></div></header>
+    <div id="notice" class="notice" hidden role="status"></div>
+    <section class="stats" aria-label="Network totals">
+      <article class="stat"><div class="stat-label">Access keys <span>⌘</span></div><strong id="count">—</strong><small>Currently authorized</small></article>
+      <article class="stat"><div class="stat-label">Active recently <span class="green">◉</span></div><strong id="active">—</strong><small>Activity observed in the last 10 seconds</small></article>
+      <article class="stat"><div class="stat-label">Total download <span>↓</span></div><strong id="download">—</strong><small>Recorded client-bound traffic</small></article>
+      <article class="stat"><div class="stat-label">Total upload <span>↑</span></div><strong id="upload">—</strong><small>Recorded client-originated traffic</small></article>
+    </section>
+    <section class="panel traffic"><div class="panel-heading"><div><h2>Network traffic</h2><p>Daily recorded transfer · UTC</p></div><span class="subtle-badge">14-day history</span></div>
+    <div class="legend"><span class="legend-download"></span>Download<span class="legend-upload"></span>Upload</div>
+    <div id="chart" class="chart" aria-label="Daily upload and download chart"></div><div class="chart-axis"><span id="chart-start"></span><span>Today</span></div>
+    </section>
+    <section class="panel" id="access"><div class="panel-heading"><div><h2>Access management <span id="table-count" class="count-badge">0</span></h2><p>Private access, with control over every connection.</p></div><label class="search-label"><span class="sr-only">Search users</span><input id="search" type="search" placeholder="Search people…"></label></div>
+    <div class="table-wrap"><table><thead><tr><th>Person</th><th>Activity</th><th>Download</th><th>Upload</th><th>Today</th><th>Last activity</th><th class="right">Manage</th></tr></thead><tbody id="users"></tbody></table></div>
+    <div id="empty" class="empty" hidden><strong>Your network starts here.</strong><p>Create an access key to invite your first person.</p></div>
+    <div class="table-note">Activity reflects observed tunnels, not the app’s connection switch. Shared keys cannot distinguish people or devices.</div></section>
+    <div class="lower-grid"><section class="panel" id="activity"><div class="panel-heading"><div><h2>Admin activity</h2><p>Recent changes to your network</p></div><span>◷</span></div><div id="events" class="events"></div></section>
+    <section class="panel about"><p class="eyebrow">ABOUT THESE NUMBERS</p><h2>Useful signals.<br>Honest limits.</h2><p>Usage is recorded from Outline every 2 seconds. TCP bytes can appear only after a connection closes.</p><p>History starts when monitoring is installed. Unsampled traffic around restarts or downtime can be missed. Totals include revoked keys.</p><small id="monitoring-since"></small><small id="updated"></small></section></div>
+    <footer><span>OUTLINE ADMIN <b>/</b> NETWORK ADMINISTRATION</span><span>Private by design. Yours to manage.</span></footer>
+  </main>
+</div>
+<dialog id="add-dialog"><form id="add-form"><div class="dialog-top"><p class="eyebrow">NEW ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2>Invite someone in.</h2><p class="muted">Create a unique, revocable key for one person.</p><label>Username<input name="name" pattern="[a-z][a-z0-9_-]{0,31}" maxlength="32" placeholder="e.g. alice" required></label><p class="field-note">Lowercase letters, numbers, hyphens and underscores.</p><div class="inline-note">Outline restarts to apply this change. Existing users will briefly reconnect.</div><p class="dialog-error" role="alert"></p><button class="primary" type="submit">Create access key ↗</button></form></dialog>
+<dialog id="key-dialog"><div class="dialog-top"><p class="eyebrow">SHARE PRIVATE ACCESS</p><button class="icon-button close" aria-label="Close">×</button></div><h2 id="key-title">Access key</h2><p class="muted">Email their personal code and setup instructions, with the Mac/iPhone DNS profile attached.</p><textarea id="key-value" readonly rows="4" aria-label="Outline access link"></textarea><div class="share-actions"><button id="copy-key" class="text-button">Copy access code</button><button id="copy-setup" class="text-button">Copy setup message</button></div><form id="email-form"><label>Recipient email<input id="share-email" type="email" autocomplete="off" placeholder="alice@example.com" required></label><button id="send-email" class="primary" type="submit" disabled>Send email with attachment</button><p id="share-status" class="field-note" role="status">Checking email configuration…</p></form><p class="field-note">Keep the access code private. Requires Outline Client 1.15.0 or newer.</p></dialog>
+<dialog id="remove-dialog"><form id="remove-form"><div class="dialog-top"><p class="eyebrow">REVOKE ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2 id="remove-title">Remove access?</h2><p class="muted">Their key will stop working. Recorded usage remains in network totals.</p><div class="inline-note">Outline will restart, disconnecting current sessions. Other authorized users can reconnect.</div><p class="dialog-error" role="alert"></p><button class="danger" type="submit">Revoke access</button></form></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>
