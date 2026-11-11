@@ -27,7 +27,7 @@ csrf = json.loads(api('GET', '/api/session'))['csrf']
 csrf = json.loads(api('POST', '/api/login', {'username':'admin', 'password':'ci-only-example'}))['csrf']
 api('POST', '/api/wireguard', {'name':'phone'})
 assert 'phone' in json.loads(api('GET', '/api/wireguard'))['devices']
-assert b'[Peer]' in api('GET', '/api/wireguard/phone/conf')
+plain = api('GET', '/api/wireguard/phone/conf')
 profile = json.loads(api('GET', '/api/wireguard/phone/json'))
 binary = '/usr/local/lib/outline-wireguard/sing-box'
 with tempfile.TemporaryDirectory() as temp:
@@ -45,5 +45,27 @@ with tempfile.TemporaryDirectory() as temp:
     finally:
         client.terminate()
         client.wait(timeout=5)
+    # Use Linux WireGuard to exercise the same .conf that the official apps import.
+    conf = Path(temp) / 'phone.conf'
+    conf.write_bytes(plain)
+    stripped = Path(temp) / 'wg.conf'
+    stripped.write_bytes(subprocess.check_output(['wg-quick', 'strip', conf]))
+    subnet = next(line.split('=', 1)[1].strip() for line in plain.decode().splitlines()
+                  if line.startswith('Address ='))
+    namespace = 'outline-wg-test'
+    subprocess.run(['ip', 'netns', 'add', namespace], check=True)
+    try:
+        subprocess.run(['ip', 'link', 'add', 'wgtest', 'type', 'wireguard'], check=True)
+        subprocess.run(['ip', 'link', 'set', 'wgtest', 'netns', namespace], check=True)
+        ns = ['ip', 'netns', 'exec', namespace]
+        subprocess.run(ns + ['wg', 'setconf', 'wgtest', stripped], check=True)
+        for address in subnet.split(', '):
+            subprocess.run(ns + ['ip', 'address', 'add', address, 'dev', 'wgtest'], check=True)
+        subprocess.run(ns + ['ip', 'link', 'set', 'wgtest', 'up'], check=True)
+        subprocess.run(ns + ['ip', 'route', 'add', 'default', 'dev', 'wgtest'], check=True)
+        subprocess.run(ns + ['curl', '-fsS', '--noproxy', '*', '--max-time', '12',
+                             'http://198.18.1.1:35801/probe'], check=True)
+    finally:
+        subprocess.run(['ip', 'netns', 'del', namespace], check=True)
 api('DELETE', '/api/wireguard/phone')
 assert json.loads(api('GET', '/api/wireguard'))['devices'] == []
