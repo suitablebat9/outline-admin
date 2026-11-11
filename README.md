@@ -1,187 +1,23 @@
-# Outline Admin
+# WireGuard dashboard
 
-A self-hosted dashboard for managing an Outline Shadowsocks-over-WebSockets server. Create individual access keys, revoke access, view recorded traffic, and email setup instructions with an Apple DNS profile attached.
+Self-host a WireGuard gateway and manage one private profile per device. Devices can connect directly with the WireGuard app or use sing-box to carry WireGuard through Shadowsocks over TCP. The dashboard supports local QR import, both profile downloads, individual revocation and per-device traffic statistics.
 
-**Bring your own domain, server, and email account.** Hostnames, passwords, access keys, and generated profiles are created on your server and are not part of this repository. This is an independent project, not an official Outline product.
+## Install or upgrade
 
-For an iPhone or Mac that connects through built-in VPN settings, see the [native IKEv2 gateway setup](native/README.md).
-
-## Features
-
-- Dark, responsive dashboard with two-second updates and manual refresh.
-- Separate access credentials for each person; copy, share, or revoke a key.
-- Per-key upload/download totals, daily traffic charts, recent activity, and an admin audit log.
-- SQLite history retained across restarts and upgrades.
-- Direct Gmail/Google Workspace invitations with a generated `.mobileconfig` attachment.
-- Optional scoped encrypted DNS profiles for Mac and iPhone.
-- Optional explicit WebSocket dial IP while preserving the HTTPS hostname.
-- Login, CSRF protection, HTTPS-only session cookies, email rate limiting, and duplicate-request protection.
-
-## Requirements
-
-Use a dedicated Debian 12+ or Ubuntu 22.04+ server or Proxmox LXC with:
-
-- Root access, systemd, an x86-64 or ARM64 CPU, and `curl`.
-- Two hostnames you control, such as `vpn.example.com` and `admin.example.com`.
-- A Cloudflare account and running Cloudflare Tunnel, or another HTTPS reverse proxy supporting WebSockets.
-- Outbound internet access. If using email, the server also needs access to Gmail's SMTP service.
-
-The installer can create a new Outline WebSocket server or reuse the existing installation at `/etc/outline-ws/config.yaml`. It installs Outline server version 1.9.2 when the binary is absent and verifies the official archive checksum. It manages nginx listeners and systemd services; use a dedicated instance rather than an unrelated production web server.
-
-## 1. Install
-
-Run **as root inside the server/LXC**, not on the Proxmox host:
+Run in a Debian 12 or Ubuntu 24.04 guest as root. The installer supports amd64 and arm64 and uses systemd, nginx and a checksum-verified sing-box release.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.1/bootstrap.sh | bash
+curl -fsSLo /tmp/update-vpn.sh https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.5.0/bootstrap.sh && bash /tmp/update-vpn.sh
 ```
 
-The installer asks for your VPN hostname, admin hostname, and admin password. On upgrades it preserves saved settings, access keys, email credentials, and traffic history. Outline restarts briefly during installation.
+On first install, enter your reachable public IPv4 address, forwarded TCP port, dashboard hostname and admin password. Publish the dashboard through your HTTPS tunnel or reverse proxy to the guest’s HTTP port 18082. Forward the selected TCP port (default 443) for sing-box and UDP 51820 for direct WireGuard. Allow these ports through applicable firewalls. A public IPv4 address reachable through your router or hosting provider is required for the VPN.
 
-You can inspect `bootstrap.sh` and `install.sh` before running them. Alternatively, download the tagged source and run `bash install.sh` from the extracted directory. Forks can set `OUTLINE_ADMIN_REPOSITORY=OWNER/REPOSITORY` for the bootstrap download; publish the matching release tag in that repository first.
+On upgrade, existing device keys, admin login and port settings are reused. The gateway briefly reconnects. The installer retires the previous project-managed Outline WebSocket and Apple IKEv2 services and moves their configuration into a root-only directory under /var/backups. Remove obsolete router forwards for UDP 500 and 4500 and the old Outline public hostname route if they were dedicated to those services. Keep the dashboard hostname route.
 
-## 2. Connect your domain
+## Devices and usage
 
-For Cloudflare Tunnel, add two published application/public hostname routes:
+Use **Add device** for each phone or computer. Open **Profile** to scan the QR in sing-box MT, download JSON for sing-box, download a config for the WireGuard app, or revoke both credentials. Device changes briefly restart the gateway. Anyone with the QR or either file can use that device’s access.
 
-| Public hostname | Service type | Service URL |
-| --- | --- | --- |
-| Your VPN hostname, e.g. `vpn.example.com` | HTTP | `YOUR_SERVER_PRIVATE_IP:18081` |
-| Your admin hostname, e.g. `admin.example.com` | HTTP | `YOUR_SERVER_PRIVATE_IP:18082` |
+Upload, download, last activity, and today’s transfer are tracked by device key. Shared profiles combine usage. The seven-day chart uses UTC. Totals include recorded usage from revoked devices. The gateway counts decrypted traffic once across both transports, excluding relay overhead. The collector samples open flows and up to 1,000 recently closed flows every two seconds, even while the dashboard is closed. Counter history starts with this release. Extended downtime, heavy churn or an abrupt gateway restart can leave gaps. Recent traffic is an activity indicator.
 
-If `cloudflared` runs on the Proxmox host, use the **LXC's IP**, not `localhost`. If it runs inside the same LXC, loopback is appropriate. Keep WebSockets enabled. The dashboard creates no DNS records and does not request a Cloudflare token.
-
-No router port forwarding is required with Cloudflare Tunnel. If firewalls are enabled, allow the two origin ports only from your tunnel host. Do not expose the loopback application or metrics listeners publicly.
-
-You may add Cloudflare Access to the **admin hostname**. Do not require a browser login for the VPN hostname: Outline cannot complete one. Avoid caching admin pages and access-key configuration files.
-
-For a locally managed tunnel, add your routes before its catch-all rule, create DNS records for both hostnames using your tunnel name, and restart `cloudflared`. A different reverse proxy must provide HTTPS and preserve WebSocket upgrades for the VPN hostname.
-
-## 3. Create access
-
-Open your chosen **HTTPS admin URL** and sign in as `admin` using the password you chose.
-
-1. Choose **Create access** and enter a username.
-2. Copy the generated `ssconf://...` link into an official Outline Client that supports WebSockets (1.15.0+ on supported platforms).
-3. Click a user's name or **Share** to view their code or copy setup instructions.
-4. Choose **Revoke** to remove their server credential and disconnect sessions.
-
-Adding or revoking access restarts Outline; other authorized users can reconnect. Existing keys imported from a supported configuration appear in the list. A hidden, never-distributed credential keeps an otherwise empty Outline configuration valid.
-
-The dashboard manages this WebSocket server independently of Outline Manager. It does not integrate with Outline Manager's management API.
-
-## 4. Optional: send invitations through Gmail
-
-Create a Google app password with 2-Step Verification enabled. See [Google's app-password instructions](https://support.google.com/accounts/answer/185833). Some Workspace policies and Advanced Protection accounts do not support app passwords; this implementation requires an account that allows them.
-
-Then run inside the LXC:
-
-```bash
-outline-admin-email-setup
-```
-
-Enter the sending address and app password at the hidden terminal prompt. Do not use your normal Google password or commit credentials. Setup verifies Gmail authentication over TLS without sending a test message.
-
-Reload the dashboard, click **Share**, enter one recipient, and choose **Send email with attachment**. The email contains the person's access code and instructions, with an actual DNS profile generated for **your deployment's hostnames** attached. A download link on your VPN hostname is included as a fallback.
-
-Credentials remain in `/etc/outline-admin/smtp.json`, readable only by root. Gmail receives the intended recipient address, access code, instructions, and attachment. The dashboard does not save recipient addresses in plaintext or include access codes in audit messages. Sending is limited to 20 requests per hour. The interface reports provider acceptance, not guaranteed inbox delivery. After an unconfirmed timeout, check the recipient inbox before sending again.
-
-## Optional: encrypted DNS profiles
-
-The installer generates a profile at:
-
-```text
-https://YOUR_VPN_HOSTNAME/profiles/outline-dns.mobileconfig
-```
-
-Download it on a working connection. It sends DNS queries only for your configured VPN/admin hostnames and their subdomains to Google Public DNS over HTTPS. It contains no access credential, root certificate, or device-management enrollment. Other domains keep their existing DNS configuration.
-
-- **Mac:** open the profile and install it through System Settings → General → Device Management, or search Settings for Profiles.
-- **iPhone:** download in Safari and install through Settings → General → VPN & Device Management.
-
-The profile is unsigned and removable from the same screen. It addresses DNS lookup problems; it does not guarantee access through IP, TLS-hostname, or WebSocket filtering. See [profile details](client-profiles/README.md).
-
-## Optional: pin the WebSocket dial address
-
-If configuration fetching works but the tunnel fails with a hostname lookup error, you can configure a verified IPv4 address for **your own server/CDN endpoint**:
-
-```bash
-/opt/outline-admin/venv/bin/python /opt/outline-admin/configure_endpoint.py --endpoint YOUR_ENDPOINT_IPV4:443
-systemctl restart outline-admin
-```
-
-The command validates HTTPS to the supplied IP with your original hostname, updates hosted client configurations, and saves the choice for future dashboard keys. It does not replace the URL hostname or disable certificate verification. No shared IP is hardcoded into this project. Revisit this setting if your endpoint's IP assignment changes.
-
-The initial dynamic configuration download still needs DNS. Pinning the later WebSocket connection alone does not fix a failed configuration download.
-
-## What the statistics mean
-
-Metrics are collected every two seconds. The first successful scrape establishes a baseline; no earlier traffic is claimed as dashboard history.
-
-- **Active recently** means tunnel-time or traffic counters increased within ten seconds. It is not an exact app connected/disconnected indicator or a device count. Idle apps and open UDP associations can affect this estimate.
-- **Unknown** means telemetry is unavailable or older than ten seconds.
-- **Upload/download** count the client-facing side of TCP and UDP traffic once, avoiding double counting the server-facing counters. Protocol overhead may be included.
-- **TCP totals can be delayed** until connections close. Faster dashboard refresh cannot remove this server reporting behavior.
-- Daily totals use the UTC day the increase was sampled. Aggregate history includes revoked users.
-- Saved history survives restarts, but unsampled traffic around restarts or monitoring downtime may be lost. These are observed usage statistics, not billing-grade accounting.
-
-## Operations
-
-```bash
-# Reset the admin password and invalidate sessions
-outline-admin-password
-
-# Inspect services and recent logs
-systemctl status outline-admin outline-ws nginx --no-pager
-journalctl -u outline-admin -u outline-ws -n 80 --no-pager
-```
-
-| Path / port | Purpose |
-| --- | --- |
-| `/etc/outline-admin/settings.json` | Local hostnames, password hash, session secret, optional dial endpoint |
-| `/etc/outline-admin/smtp.json` | Optional local email credential |
-| `/etc/outline-ws/config.yaml` | Outline server keys and WebSocket paths |
-| `/etc/outline-ws/users.json` | Username-to-key mapping |
-| `/var/lib/outline-ws/keys` | Secret, randomly named client configuration files |
-| `/var/lib/outline-ws/profiles` | Generated deployment-specific DNS profile |
-| `/var/lib/outline-admin` | Persistent usage and audit database |
-| TCP 18081 / 18082 | VPN origin / admin origin, for your HTTPS proxy |
-| Loopback 18080 / 18083 / 19090 | WebSocket server / dashboard / metrics |
-
-Back up configuration and state privately. Stop the admin service while copying its SQLite database, or use a consistent SQLite backup. Treat backups and access links as credentials. Do not commit runtime files to GitHub.
-
-This is a small single-admin application. The dashboard runs as root to manage root-owned configuration and restart Outline, with systemd filesystem restrictions. Use a strong password, HTTPS, and trusted administrators. Browser-visible code cannot submit arbitrary email content, attachments, or SMTP credentials. Updates rewrite the project's nginx listeners; custom proxy changes should be tracked separately.
-
-## Development
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m unittest discover -s tests -v
-node --test tests/sharing.test.cjs
-node --check static/app.js
-bash -n install.sh bootstrap.sh
-```
-
-Tests use temporary files, example domains, and mocked SMTP; they never send real email. GitHub Actions checks Python 3.11 and 3.13. Actual systemd installation, email delivery, and reverse-proxy connectivity must be verified on your deployment.
-
-## References and license
-
-- [Outline WebSocket setup](https://developer.getoutline.org/vpn/advanced/websockets/)
-- [Outline access-key configuration](https://developer.getoutline.org/vpn/reference/access-key-config/)
-- [Apple DNS profile schema](https://github.com/apple/device-management/blob/release/mdm/profiles/com.apple.dnsSettings.managed.yaml)
-- [MIT license](LICENSE)
-
-## WireGuard with optional Shadowsocks
-
-Run the following inside the dashboard guest as root. The installer upgrades the dashboard, installs a checksum-verified sing-box gateway and asks for the public IPv4 address clients can reach. It supports amd64 and arm64 Debian/Ubuntu guests using systemd. The gateway uses userspace WireGuard and needs no additional Proxmox kernel module. The dashboard upgrade briefly restarts Outline.
-
-```bash
-curl -fsSLo /tmp/install-wg.sh https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.1/wireguard/install.sh && bash /tmp/install-wg.sh
-```
-
-Forward the chosen TCP port (default 443) to the same TCP port on the guest for WireGuard over Shadowsocks. Forward UDP 51820 to the guest only if you also want direct connections. Allow the respective ports through any guest and Proxmox firewalls. Profiles use the entered IPv4 address directly. If it changes, update the host field in the root-only devices.json and download the profiles again.
-
-Open **WireGuard devices**, create one entry per device, and download its private profile. Import the JSON into [sing-box for Apple platforms](https://sing-box.sagernet.org/clients/apple/) for WireGuard over Shadowsocks over TCP. Import the conf file into the [official WireGuard app](https://www.wireguard.com/install/) for direct UDP. Use one VPN at a time. Revoking the device invalidates both credentials. Changes briefly reconnect other WireGuard devices. The WireGuard gateway provides IPv4 internet access, and the profiles request both default routes. The dashboard’s historical traffic chart covers Outline.
-
-For iPhone setup, click **Show sing-box QR** beside the device. In sing-box MT, choose **Scan QR Code** and confirm the import. The code contains the complete private profile and is generated locally by the dashboard.
+The monitoring API binds to loopback port 18971 and requires a server-derived secret. Statistics and login state use SQLite in /var/lib/outline-admin. Device secrets remain in /etc/outline-wireguard/devices.json. Use the existing outline-admin-password command to reset the dashboard login.

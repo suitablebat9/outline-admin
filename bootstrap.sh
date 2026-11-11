@@ -9,7 +9,7 @@ fi
 command -v curl >/dev/null || { echo 'Install curl first: apt-get update && apt-get install -y curl'; exit 1; }
 
 
-outline_release='v0.4.1'
+outline_release='v0.5.0'
 outline_repository="${OUTLINE_ADMIN_REPOSITORY:-suitablebat9/outline-admin}"
 outline_download="$(mktemp -d)"
 trap 'rm -rf "$outline_download"' EXIT
@@ -19,4 +19,4 @@ curl --fail --show-error --silent --location --retry 3 \
 mkdir "$outline_download/source"
 tar --no-same-owner -xzf "$outline_download/source.tar.gz" \
   --strip-components=1 -C "$outline_download/source"
-bash "$outline_download/source/install.sh"
+bash "$outline_download/source/wireguard/setup.sh"

@@ -11,7 +11,7 @@ case "$(dpkg --print-architecture)" in
   *) echo 'Requires an amd64 or arm64 guest.' >&2; exit 1 ;;
 esac
 if [[ ! -f /etc/outline-wireguard/devices.json ]]; then
-  read -rp 'Working home public IPv4 (same as your IKEv2 server): ' address </dev/tty
+  read -rp 'Working home public IPv4: ' address </dev/tty
   read -rp 'External TCP port forwarded to this LXC (default 443): ' port </dev/tty
   port=${port:-443}
   python3 -c 'import ipaddress,sys; ipaddress.IPv4Address(sys.argv[1]); assert 0 < int(sys.argv[2]) < 65536' "$address" "$port"
@@ -64,4 +64,6 @@ UNIT
 systemctl daemon-reload
 systemctl enable outline-wireguard.service
 systemctl restart outline-wireguard.service
-echo 'Open WireGuard devices in the dashboard and create one entry per device.'
+# Retire the old listeners only after the replacement gateway and dashboard are running.
+bash "$source_dir/wireguard/retire-legacy.sh"
+echo 'Open the dashboard to manage devices and view network usage.'

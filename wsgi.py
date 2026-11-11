@@ -1,4 +1,5 @@
-from app import create_app, start_collector
+from app import create_app
+import metrics
 
 app = create_app()
-start_collector(app)
+metrics.start(app.config['USAGE_DATABASE'])

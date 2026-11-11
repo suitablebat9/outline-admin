@@ -1,0 +1,15 @@
+syntax = "proto3";
+package dashboard_usage;
+// Wire-compatible subset of sing-box v1.14 daemon/started_service.proto.
+// Request only the first SubscribeConnections message (a cumulative snapshot).
+message Request { int64 interval = 1; }
+message Snapshot { repeated Event events = 1; }
+message Event { Connection connection = 3; }
+message Connection {
+  string id = 1;
+  string inbound = 2;
+  int64 closed_at = 13;
+  int64 upload = 16;
+  int64 download = 17;
+  string outbound = 19;
+}

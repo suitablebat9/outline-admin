@@ -1,78 +1,117 @@
-const $=s=>document.querySelector(s);
-let csrf=$('meta[name="csrf-token"]').content, users=[], removing=null, busy=false, refreshing=false, historySignature=null, eventSignature=null, sharingName=null, sharingId=null, sendRequestId=null;
-const bytes=n=>{if(!n)return '0 B';const u=['B','KiB','MiB','GiB','TiB'];const i=Math.min(4,Math.floor(Math.log(n)/Math.log(1024)));return `${(n/1024**i).toFixed(i?1:0)} ${u[i]}`};
-const when=t=>t?new Date(t*1000).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Not observed';
-function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e}
-function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,3500)}
-async function api(url,options={}){const response=await fetch(url,{signal:AbortSignal.timeout(options.method ? 60000 : 15000),...options,headers:{'Content-Type':'application/json','X-CSRF-Token':csrf,...options.headers}});let data;try{data=await response.json()}catch{throw Error('Unexpected server response. Check the admin tunnel route.')}if(!response.ok){if(response.status===401&&!url.endsWith('/login'))showLogin();throw Error(data.error||'Request failed.')}return data}
-function showLogin(){$('#dashboard').hidden=true;$('#login').hidden=false;document.querySelectorAll('dialog[open]').forEach(d=>d.close());$('#key-value').value=''}
-function showKey(name,key,id){
-  sharingName=name;sharingId=id;sendRequestId=crypto.randomUUID();
-  $('#email-form').reset();$('#share-email').disabled=false;
-  $('#send-email').disabled=true;$('#send-email').textContent='Send email with attachment';
-  $('#share-status').textContent='Checking email configuration…';
-  $('#key-title').textContent=`Access for ${name}`;$('#key-value').value=key;$('#copy-key').textContent='Copy access code';$('#key-dialog').showModal();
-  api('/api/email/status').then(status=>{if(sharingId!==id)return;$('#send-email').disabled=!status.ready;$('#share-status').textContent=status.ready?`Sends from ${status.sender}. The access code and actual DNS profile file will be emailed to the address you enter.`:'Email setup required: run outline-admin-email-setup inside your LXC, then reopen this panel.'}).catch(()=>{if(sharingId===id)$('#share-status').textContent='Could not check email setup. Close and reopen this panel.'});
+'use strict';
+const $ = selector => document.querySelector(selector);
+let csrf = $('meta[name="csrf-token"]').content;
+let latest, currentDevice, loading = false, signature = '';
+const bytes = number => {
+  if (!number) return '0 B';
+  const units = ['B','KiB','MiB','GiB','TiB','PiB'];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(number) / Math.log(1024)));
+  return (number / 1024 ** index).toFixed(index ? 1 : 0) + ' ' + units[index];
+};
+function element(tag, text) {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  return node;
 }
-function renderUsers(){
-  const term=$('#search').value.toLowerCase();
-  const filtered=users.filter(u=>u.name.toLowerCase().includes(term));
-  const body=$('#users'), wanted=new Set(filtered.map(u=>u.id));
-  for(const row of [...body.children])if(!wanted.has(row.dataset.id))row.remove();
-  $('#empty').hidden=filtered.length>0;
-  $('#empty strong').textContent=users.length?'No matching people.':'Your network starts here.';
-  $('#empty p').textContent=users.length?'Try a different search.':'Create an access key to invite your first person.';
-  for(const u of filtered){
-    let tr=[...body.children].find(row=>row.dataset.id===u.id);
-    if(!tr){
-      tr=el('tr');tr.dataset.id=u.id;
-      const person=el('div',undefined,'person');
-      person.append(el('div',u.name.slice(0,2),'avatar'));
-      const identity=el('div');const personButton=el('button',u.name,'person-name');personButton.setAttribute('aria-label',`Share access for ${u.name}`);identity.append(personButton,el('small',u.legacy?'Existing server key':'Personal access'));person.append(identity);
-      const td=el('td');td.append(person);tr.append(td);
-      const activity=el('td');activity.append(el('span','','activity-pill'));tr.append(activity);
-      for(let i=0;i<4;i++)tr.append(el('td',''));
-      const actions=el('td',undefined,'right');
-      const view=el('button','Share','text-button');
-      const openShare=async()=>{view.disabled=true;personButton.disabled=true;try{showKey(u.name,(await api(`/api/users/${encodeURIComponent(u.id)}/key`)).key,u.id)}catch(e){toast(e.message)}finally{view.disabled=false;personButton.disabled=false}};view.addEventListener('click',openShare);personButton.addEventListener('click',openShare);
-      const remove=el('button','Revoke','revoke');
-      remove.addEventListener('click',()=>{removing=u;$('#remove-title').textContent=`Revoke ${u.name}'s access?`;$('#remove-dialog .dialog-error').textContent='';$('#remove-dialog').showModal()});
-      actions.append(view,remove);tr.append(actions);body.append(tr);
+function signedIn(value) {
+  $('#login').hidden = value;
+  $('#dashboard').hidden = $('#logout').hidden = !value;
+  if (!value) document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+}
+async function api(url, method='GET', body) {
+  const response = await fetch(url, {method, headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+    body:body ? JSON.stringify(body) : undefined, signal:AbortSignal.timeout(55000)});
+  const result = await response.json();
+  if (!response.ok) {
+    if (response.status === 401) signedIn(false);
+    throw Error(result.error || 'Request failed.');
+  }
+  return result;
+}
+function openProfile(name) {
+  currentDevice = name;
+  const url = '/api/wireguard/' + encodeURIComponent(name);
+  $('#profile-title').textContent = name;
+  $('#conf').href = url + '/conf'; $('#json').href = url + '/json';
+  $('#qr-status').textContent = 'Loading QR code…'; $('#qr').hidden = true;
+  $('#qr').src = url + '/sing-box-qr'; $('#profile').showModal();
+}
+function render() {
+  if (!latest) return;
+  const now = Date.now()/1000;
+  const live = latest.sampled && now-latest.sampled < 8;
+  $('#status').classList.toggle('live', Boolean(live));
+  $('#status').textContent = live ? 'Gateway online · updates every 2 seconds' : 'Live stats unavailable · showing recorded totals';
+  $('#count').textContent = latest.devices.length;
+  $('#down').textContent = bytes(latest.down); $('#up').textContent = bytes(latest.up);
+  const rows = (latest.rows || []).filter(d => d.name.toLowerCase().includes($('#search').value.trim().toLowerCase()));
+  const view = rows.map(d => ({...d, recent:live && d.seen && now-d.seen<30}));
+  const next = JSON.stringify([view,live,latest.days,Math.floor(now/86400)]);
+  if (next === signature) return;
+  signature = next;
+  $('#rows').replaceChildren(...view.map(d => {
+    const row=document.createElement('tr'), person=element('td','');
+    const last = d.seen ? 'Last traffic ' + new Date(d.seen*1000).toLocaleString() : 'No traffic recorded';
+    const activity=element('small', d.recent ? 'Active recently' : last);
+    activity.className='activity' + (d.recent ? ' active' : '');
+    person.append(element('strong',d.name),activity);
+    const action=element('td',''), button=element('button','Profile');
+    button.setAttribute('aria-label','Profile for ' + d.name); button.onclick=()=>openProfile(d.name);
+    action.append(button); row.append(person,element('td',bytes(d.down)),element('td',bytes(d.up)),element('td',bytes(d.today)),action);
+    return row;
+  }));
+  $('#empty').hidden = rows.length > 0;
+  $('#empty').textContent = latest.devices.length ? 'No devices match your search.' : 'Add a device to create its first profile.';
+  const days = new Map((latest.days||[]).map(d=>[d.day,d]));
+  const peak = Math.max(1,...Array.from(days.values(),d=>d.up+d.down));
+  const ns='http://www.w3.org/2000/svg';
+  $('#chart').replaceChildren(...Array.from({length:7},(_,i)=>{
+    const date=new Date((Math.floor(now/86400)-6+i)*86400000);
+    const key=date.toISOString().slice(0,10), daily=days.get(key)||{up:0,down:0};
+    const day=element('div','');day.className='day';day.setAttribute('role','listitem');
+    day.title=key+' · Download '+bytes(daily.down)+' · Upload '+bytes(daily.up);
+    day.setAttribute('aria-label',day.title);
+    const svg=document.createElementNS(ns,'svg'); svg.setAttribute('viewBox','0 0 40 80');
+    let y=80;
+    for(const [value,color] of [[daily.down,'#82e6c3'],[daily.up,'#799eed']]){
+      const height=value/peak*78; y-=height;
+      const rect=document.createElementNS(ns,'rect');
+      for(const [attr,v] of Object.entries({x:7,y,width:26,height,fill:color})) rect.setAttribute(attr,v);
+      svg.append(rect);
     }
-    const pill=tr.children[1].firstChild;
-    pill.textContent=u.activity;
-    pill.className='activity-pill '+(u.activity==='Active recently'?'on':u.activity==='Unknown'?'unknown':'');
-    [bytes(u.download),bytes(u.upload),bytes(u.today),when(u.last_active)].forEach((value,i)=>{if(tr.children[i+2].textContent!==value)tr.children[i+2].textContent=value});
-  }
+    day.append(svg,document.createTextNode(date.toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'})));return day;
+  }));
 }
-function chart(history){const map=new Map(history.map(d=>[d.day,d]));const days=[];for(let i=13;i>=0;i--){const d=new Date();d.setUTCDate(d.getUTCDate()-i);const day=d.toISOString().slice(0,10);days.push(map.get(day)||{day,download:0,upload:0})}const max=Math.max(1,...days.map(d=>d.upload+d.download));const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 980 150');svg.setAttribute('preserveAspectRatio','none');for(let i=0;i<days.length;i++){const d=days[i],download=140*d.download/max,upload=140*d.upload/max;for(const [height,y,color]of [[download,150-download,'#59dfb4'],[upload,150-download-upload,'#6678f4']]){const rect=document.createElementNS(ns,'rect');Object.entries({x:i*70+12,y,width:42,height,rx:2,fill:color}).forEach(([k,v])=>rect.setAttribute(k,v));const title=document.createElementNS(ns,'title');title.textContent=`${d.day}: ${bytes(d.download)} downloaded, ${bytes(d.upload)} uploaded`;rect.append(title);svg.append(rect)}}$('#chart').replaceChildren(svg);if(max===1){const title=document.createElementNS(ns,'text');title.setAttribute('x','490');title.setAttribute('y','80');title.setAttribute('text-anchor','middle');title.setAttribute('fill','#819397');title.setAttribute('font-size','12');title.textContent='Recorded traffic will appear here';svg.append(title)}$('#chart-start').textContent=days[0].day}
-async function refresh(){if($('#dashboard').hidden||busy||refreshing||document.hidden)return;refreshing=true;$('#refresh-now').disabled=true;try{const d=await api('/api/dashboard');users=d.users;$('#count').textContent=users.length;$('#table-count').textContent=users.length;$('#active').textContent=d.healthy?users.filter(u=>u.activity==='Active recently').length:'—';$('#download').textContent=bytes(d.total_download);$('#upload').textContent=bytes(d.total_upload);$('#health').textContent=d.healthy?'● Live · 2s':'○ Metrics unavailable';$('#health').className='pill'+(d.healthy?'':' warn');$('#notice').hidden=d.healthy;$('#notice').textContent='Metrics are unavailable. Activity is unknown; recorded totals are retained. Check the Outline metrics listener and service.';$('#monitoring-since').textContent='Monitoring installed '+when(d.started);$('#updated').textContent='Last successful sample '+when(d.last_ok);renderUsers();const nextHistory=JSON.stringify(d.history);if(nextHistory!==historySignature){chart(d.history);historySignature=nextHistory}const nextEvents=JSON.stringify(d.events);if(nextEvents!==eventSignature){eventSignature=nextEvents;$('#events').replaceChildren();for(const event of d.events){const row=el('div',undefined,'event');const detail=el('div',event.action);detail.append(el('small',event.username));row.append(detail,el('time',when(event.at)));$('#events').append(row)}if(!d.events.length)$('#events').append(el('p','No admin actions yet.','muted'))}}catch(e){$('#notice').hidden=false;$('#notice').textContent=e.name==='TimeoutError'?'Refresh timed out. Retrying automatically.':e.message;$('#health').textContent='○ Connection interrupted';$('#health').className='pill warn';$('#active').textContent='—'}finally{refreshing=false;$('#refresh-now').disabled=false}}
-$('#login-form').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('button');button.disabled=true;$('#login-error').textContent='';try{const f=new FormData(e.target);const d=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});csrf=d.csrf;e.target.password.value='';$('#login').hidden=true;$('#dashboard').hidden=false;await refresh()}catch(error){$('#login-error').textContent=error.message}finally{button.disabled=false}});
-$('#logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST'});location.reload()}catch(e){toast(e.message)}});
-$('#open-add').addEventListener('click',()=>{$('#add-form').reset();$('#add-dialog .dialog-error').textContent='';$('#add-dialog').showModal()});
-document.querySelectorAll('.close').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
-$('#key-dialog').addEventListener('close',()=>{$('#key-value').value='';$('#email-form').reset();sharingName=null;sharingId=null;sendRequestId=null});
-$('#search').addEventListener('input',renderUsers);
-$('#copy-key').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('#key-value').value);$('#copy-key').textContent='Copied ✓'}catch{$('#key-value').select();toast('Select and copy the access link.')}});
-$('#add-form').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('[type=submit]');button.disabled=true;busy=true;try{const name=new FormData(e.target).get('name');const result=await api('/api/users',{method:'POST',body:JSON.stringify({name})});$('#add-dialog').close();showKey(result.name,result.key,result.id);toast('Access created')}catch(error){$('#add-dialog .dialog-error').textContent=error.message}finally{button.disabled=false;busy=false;await refresh()}});
-$('#remove-form').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('[type=submit]');button.disabled=true;busy=true;try{await api(`/api/users/${encodeURIComponent(removing.id)}`,{method:'DELETE'});$('#remove-dialog').close();toast('Access revoked')}catch(error){$('#remove-dialog .dialog-error').textContent=error.message}finally{button.disabled=false;busy=false;await refresh()}});
-async function init(){try{const state=await api('/api/session');csrf=state.csrf;$('#domain').textContent=state.domain;if(state.authenticated){$('#dashboard').hidden=false;await refresh()}else showLogin()}catch(e){showLogin();$('#login-error').textContent=e.message}}
-$('#refresh-now').addEventListener('click',refresh);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
-window.addEventListener('online',refresh);
-init();setInterval(refresh,2000);
-
-$('#copy-setup').addEventListener('click',async()=>{try{const message=OutlineShare.buildShareMessage(sharingName,$('#key-value').value);await navigator.clipboard.writeText(message.body);toast('Setup message copied')}catch(e){$('#share-status').textContent='Unable to copy automatically. Use Copy access code instead.'}});
-$('#email-form').addEventListener('submit',async e=>{
-  e.preventDefault();const id=sharingId,requestId=sendRequestId;
-  if(!id||!requestId||$('#send-email').disabled)return;
-  $('#send-email').disabled=true;$('#share-email').disabled=true;
-  $('#send-email').textContent='Sending…';$('#share-status').textContent='Sending the access code and profile attachment…';
-  try{
-    const result=await api(`/api/users/${encodeURIComponent(id)}/email`,{method:'POST',body:JSON.stringify({email:$('#share-email').value.trim(),request_id:requestId})});
-    if(sharingId===id&&sendRequestId===requestId){$('#send-email').textContent='Email accepted ✓';$('#share-status').textContent=result.message}
-    toast('Email accepted by the mail provider');
-  }catch(error){
-    if(sharingId===id&&sendRequestId===requestId){$('#send-email').textContent='Send not confirmed';$('#share-status').textContent=(error.name==='TimeoutError'?'The request timed out. Delivery may have completed; check the recipient inbox.':error.message)+' Close and reopen Share before making a new send attempt.'}
-  }
-});
+async function refresh() {
+  if ($('#dashboard').hidden || document.hidden || loading) return;
+  loading=true;
+  try {latest=await api('/api/wireguard'); render(); $('#notice').textContent='';}
+  catch(e){ $('#status').classList.remove('live'); $('#status').textContent='Dashboard unavailable'; $('#notice').textContent=e.message; }
+  finally {loading=false;}
+}
+$('#search').oninput=render;
+$('#new').onclick=()=>{ $('#add-form').reset(); $('.err').textContent=''; $('#add').showModal(); };
+document.querySelectorAll('.close').forEach(b=>b.onclick=()=>b.closest('dialog').close());
+$('#qr').onload=()=>{$('#qr').hidden=false;$('#qr-status').textContent='';};
+$('#qr').onerror=()=>{$('#qr-status').textContent='QR unavailable. Download the sing-box profile below.';};
+$('#profile').onclose=()=>{$('#qr').removeAttribute('src');currentDevice=null;};
+$('#add-form').onsubmit=async e=>{
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('.primary');button.disabled=true;
+  try {const name=form.elements.name.value.trim();await api('/api/wireguard','POST',{name});$('#add').close();await refresh();openProfile(name);}
+  catch(error){$('.err').textContent=error.message;}finally{button.disabled=false;}
+};
+$('#remove').onclick=async()=>{
+  if (!currentDevice || !confirm('Revoke both profiles for '+currentDevice+'? Other devices will briefly reconnect.')) return;
+  $('#remove').disabled=true;
+  try{await api('/api/wireguard/'+encodeURIComponent(currentDevice),'DELETE');$('#profile').close();await refresh();}
+  catch(error){$('#qr-status').textContent=error.message;}finally{$('#remove').disabled=false;}
+};
+$('#login-form').onsubmit=async e=>{
+  e.preventDefault();const form=e.currentTarget;
+  try {const data=await api('/api/login','POST',Object.fromEntries(new FormData(form)));csrf=data.csrf;form.password.value='';$('#login-error').textContent='';signedIn(true);await refresh();}
+  catch(error){$('#login-error').textContent=error.message;}
+};
+$('#logout').onclick=async()=>{try{await api('/api/logout','POST');location.reload();}catch(error){$('#notice').textContent=error.message;}};
+api('/api/session').then(s=>{csrf=s.csrf;signedIn(s.authenticated);refresh();}).catch(e=>{signedIn(false);$('#login-error').textContent=e.message;});
+setInterval(refresh,2000);
+document.addEventListener('visibilitychange',refresh);

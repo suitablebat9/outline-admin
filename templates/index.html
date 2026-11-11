@@ -1,74 +1,35 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="csrf-token" content="{{ csrf }}">
-  <title>Outline Admin · VPN administration</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/sharing.js" defer></script>
-  <script src="/static/app.js" defer></script>
-  <script src="/static/wireguard.js" defer></script>
-  <script src="/static/native.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}"><meta name="color-scheme" content="dark">
+  <title>WireGuard · Network dashboard</title>
+  <link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
 </head>
 <body>
-{% if preview %}<div class="notice" role="status">LOCAL PREVIEW · Sample data only. This is not connected to your LXC.</div>{% endif %}
-<section id="login" class="login-shell" hidden>
-  <div class="login-card"><div class="brand-mark">O<span>•</span></div><p class="eyebrow">OUTLINE ADMIN / PRIVATE NETWORK</p>
-  <h1>Your network.<br>Your control.</h1><p class="muted">Sign in to manage access and monitor usage.</p>
-  <form id="login-form"><label>Username<input name="username" autocomplete="username" value="admin" required></label>
-  <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-  <button class="primary" type="submit">Sign in <span>↗</span></button><p id="login-error" role="alert"></p></form>
-  <small>Private administration · Outline Admin</small></div>
-</section>
-<div id="dashboard" class="shell" hidden>
-  <aside><a class="brand" href="/">OUTLINE<span>ADMIN</span><i>•</i></a>
-    <div class="workspace"><div class="workspace-icon">O</div><div>Private network<small>Network administration</small></div></div>
-    <p class="nav-label">WORKSPACE</p><a class="nav active" href="#overview">◈ <span>Overview</span></a>
-    <a class="nav" href="#access">⌘ <span>Access management</span></a><a class="nav" href="#activity">◷ <span>Admin activity</span></a>
-    <div class="sidebar-bottom"><div class="mini-status"><span class="dot"></span> Self-hosted on your LXC</div><p id="domain"></p><button id="logout" class="logout">Sign out ↗</button></div>
-  </aside>
-  <main id="overview"><header><div><p class="eyebrow">NETWORK / OVERVIEW</p><h1>Network overview<span class="title-dot">.</span></h1><p class="muted">Your people. Your traffic. Your private network.</p></div>
-    <div class="header-actions"><span id="health" class="pill">Checking metrics…</span><button id="refresh-now" class="text-button" aria-label="Refresh dashboard">↻ Refresh</button><button id="open-add" class="primary">＋ Create access</button></div></header>
-    <div id="notice" class="notice" hidden role="status"></div>
-    <section class="stats" aria-label="Network totals">
-      <article class="stat"><div class="stat-label">Access keys <span>⌘</span></div><strong id="count">—</strong><small>Currently authorized</small></article>
-      <article class="stat"><div class="stat-label">Active recently <span class="green">◉</span></div><strong id="active">—</strong><small>Activity observed in the last 10 seconds</small></article>
-      <article class="stat"><div class="stat-label">Total download <span>↓</span></div><strong id="download">—</strong><small>Recorded client-bound traffic</small></article>
-      <article class="stat"><div class="stat-label">Total upload <span>↑</span></div><strong id="upload">—</strong><small>Recorded client-originated traffic</small></article>
-    </section>
-    <section class="panel traffic"><div class="panel-heading"><div><h2>Network traffic</h2><p>Daily recorded transfer · UTC</p></div><span class="subtle-badge">14-day history</span></div>
-    <div class="legend"><span class="legend-download"></span>Download<span class="legend-upload"></span>Upload</div>
-    <div id="chart" class="chart" aria-label="Daily upload and download chart"></div><div class="chart-axis"><span id="chart-start"></span><span>Today</span></div>
-    </section>
-    <section class="panel" id="access"><div class="panel-heading"><div><h2>Access management <span id="table-count" class="count-badge">0</span></h2><p>Private access, with control over every connection.</p></div><label class="search-label"><span class="sr-only">Search users</span><input id="search" type="search" placeholder="Search people…"></label></div>
-    <div class="table-wrap"><table><thead><tr><th>Person</th><th>Activity</th><th>Download</th><th>Upload</th><th>Today</th><th>Last activity</th><th class="right">Manage</th></tr></thead><tbody id="users"></tbody></table></div>
-    <div id="empty" class="empty" hidden><strong>Your network starts here.</strong><p>Create an access key to invite your first person.</p></div>
-    <div class="table-note">Activity reflects observed tunnels, not the app’s connection switch. Shared keys cannot distinguish people or devices.</div></section>
-    <details class="panel" id="wg-panel"><summary>WireGuard devices</summary>
-      <p id="wg-status" class="muted" role="status"></p>
-      <form id="wg-add" hidden><label>Device name<input name="name" required maxlength="15" placeholder="e.g. alice-iphone"></label>
-        <button class="primary" type="submit">Create device</button></form>
-      <div class="table-wrap"><table><thead><tr><th>Device</th><th>Download private profile</th><th>Manage</th></tr></thead><tbody id="wg-devices"></tbody></table></div>
-    </details>
-    <details class="panel" id="native-panel"><summary>Apple VPN accounts (IKEv2)</summary>
-      <p id="native-status" class="muted" role="status"></p>
-      <form id="native-add" hidden><label>VPN username<input name="name" maxlength="64" pattern="[A-Za-z0-9_\-]+" required></label>
-        <button class="primary" type="submit">Create VPN account</button></form>
-      <div class="table-wrap"><table><thead><tr><th>Username</th><th>Connected devices</th><th>Session upload</th><th>Session download</th><th>Manage</th></tr></thead><tbody id="native-users"></tbody></table></div>
-    </details>
-    <div class="lower-grid"><section class="panel" id="activity"><div class="panel-heading"><div><h2>Admin activity</h2><p>Recent changes to your network</p></div><span>◷</span></div><div id="events" class="events"></div></section>
-    <section class="panel about"><p class="eyebrow">ABOUT THESE NUMBERS</p><h2>Useful signals.<br>Honest limits.</h2><p>Usage is recorded from Outline every 2 seconds. TCP bytes can appear only after a connection closes.</p><p>History starts when monitoring is installed. Unsampled traffic around restarts or downtime can be missed. Totals include revoked keys.</p><small id="monitoring-since"></small><small id="updated"></small></section></div>
-    <footer><span>OUTLINE ADMIN <b>/</b> NETWORK ADMINISTRATION</span><span>Private by design. Yours to manage.</span></footer>
-  </main>
-</div>
-<dialog id="add-dialog"><form id="add-form"><div class="dialog-top"><p class="eyebrow">NEW ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2>Invite someone in.</h2><p class="muted">Create a unique, revocable key for one person.</p><label>Username<input name="name" pattern="[a-z][a-z0-9_-]{0,31}" maxlength="32" placeholder="e.g. alice" required></label><p class="field-note">Lowercase letters, numbers, hyphens and underscores.</p><div class="inline-note">Outline restarts to apply this change. Existing users will briefly reconnect.</div><p class="dialog-error" role="alert"></p><button class="primary" type="submit">Create access key ↗</button></form></dialog>
-<dialog id="key-dialog"><div class="dialog-top"><p class="eyebrow">SHARE PRIVATE ACCESS</p><button class="icon-button close" aria-label="Close">×</button></div><h2 id="key-title">Access key</h2><p class="muted">Email their personal code and setup instructions, with the Mac/iPhone DNS profile attached.</p><textarea id="key-value" readonly rows="4" aria-label="Outline access link"></textarea><div class="share-actions"><button id="copy-key" class="text-button">Copy access code</button><button id="copy-setup" class="text-button">Copy setup message</button></div><form id="email-form"><label>Recipient email<input id="share-email" type="email" autocomplete="off" placeholder="alice@example.com" required></label><button id="send-email" class="primary" type="submit" disabled>Send email with attachment</button><p id="share-status" class="field-note" role="status">Checking email configuration…</p></form><p class="field-note">Keep the access code private. Requires Outline Client 1.15.0 or newer.</p></dialog>
-<dialog id="remove-dialog"><form id="remove-form"><div class="dialog-top"><p class="eyebrow">REVOKE ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2 id="remove-title">Remove access?</h2><p class="muted">Their key will stop working. Recorded usage remains in network totals.</p><div class="inline-note">Outline will restart, disconnecting current sessions. Other authorized users can reconnect.</div><p class="dialog-error" role="alert"></p><button class="danger" type="submit">Revoke access</button></form></dialog>
-<dialog id="wg-qr" aria-labelledby="wg-qr-title">
-  <div class="dialog-top"><h2 id="wg-qr-title">Scan device profile</h2><button class="close icon-button" aria-label="Close">×</button></div>
-  <p id="wg-qr-status" role="status"></p><img id="wg-qr-image" alt="Private sing-box device profile" hidden>
-  <p class="field-note">Anyone who scans this code can use this device’s VPN access.</p>
-</dialog>
-<dialog id="native-secret"><div class="dialog-top"><h2>VPN password</h2><button class="close icon-button" aria-label="Close">×</button></div><label id="native-owner" for="native-value"></label><input id="native-value" readonly></dialog>
-<div id="toast" class="toast" role="status" hidden></div>
+<header class="top"><div class="wrap bar"><div class="brand"><span class="mark" aria-hidden="true"></span>WireGuard <span class="divider">/</span> <span class="soft">Dashboard</span></div><button id="logout" class="quiet" hidden>Sign out</button></div></header>
+<section id="login" class="login" hidden><h1>Sign in</h1><form id="login-form">
+<label>Username<input name="username" autocomplete="username" value="admin" required></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<p id="login-error" role="alert"></p><button class="primary">Sign in</button></form></section>
+<main id="dashboard" class="wrap" hidden>
+  <div class="headline"><div><h1>Network overview</h1><p id="status" class="status" role="status">Checking gateway…</p></div><button id="new" class="primary">＋ Add device</button></div>
+  <div class="overview">
+    <section class="panel traffic"><div class="panel-title"><h2>Network traffic</h2><span class="period">Last 7 days · UTC</span></div>
+      <div class="chart" id="chart" role="list" aria-label="Daily traffic totals"></div>
+      <div class="legend"><i></i>Download <i></i>Upload</div></section>
+    <section class="panel totals"><h2>Recorded usage</h2><dl><div><dt>↓ Download</dt><dd id="down">—</dd></div><div><dt>↑ Upload</dt><dd id="up">—</dd></div></dl></section>
+  </div>
+  <section class="panel devices"><div class="panel-title"><h2>Devices <span id="count">0</span></h2><label class="search"><span class="sr-only">Search devices</span><input id="search" type="search" placeholder="Search devices"></label></div>
+  <div class="scroll"><table><thead><tr><th>Device</th><th>Download</th><th>Upload</th><th>Today</th><th><span class="sr-only">Profiles and access</span></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <p id="empty" class="empty" hidden></p>
+  <div class="footnote">Usage is recorded per device. Recent activity means traffic was observed in the last 30 seconds.</div></section>
+  <p id="notice" role="status"></p>
+</main>
+<dialog id="add"><form id="add-form"><div class="panel-title"><h2>Add device</h2><button type="button" class="close" aria-label="Close">×</button></div>
+<label>Device name<input name="name" maxlength="15" required placeholder="e.g. alex-iphone" autocomplete="off"></label><p>Use one profile per device. Adding a device briefly reconnects the gateway.</p><p class="err" role="alert"></p><button class="primary">Create device</button></form></dialog>
+<dialog id="profile"><div class="panel-title"><h2 id="profile-title">Device profile</h2><button class="close" aria-label="Close">×</button></div>
+<p>In sing-box MT, choose <strong>Scan QR Code</strong> and scan this private profile.</p><img id="qr" alt="Private sing-box profile QR code" hidden><p id="qr-status" role="status"></p>
+<div class="downloads"><a id="json" download>Download sing-box JSON ↓</a><a id="conf" download>Download WireGuard config ↓</a></div>
+<button id="remove" class="danger">Revoke device</button></dialog>
 </body></html>

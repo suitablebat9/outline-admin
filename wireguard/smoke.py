@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 
 cookie = ''
 csrf = ''
@@ -21,6 +22,16 @@ def api(method, path, payload=None):
     connection.close()
     assert response.status < 300, (response.status, body)
     return body
+
+
+def wait_for_usage(previous_up, previous_down):
+    for _ in range(20):
+        data = json.loads(api('GET', '/api/wireguard'))
+        row = next(r for r in data['rows'] if r['name'] == 'phone')
+        if row['up'] > previous_up and row['down'] > previous_down:
+            return row
+        time.sleep(0.5)
+    raise AssertionError('No bidirectional usage recorded for the device')
 
 
 csrf = json.loads(api('GET', '/api/session'))['csrf']
@@ -45,6 +56,7 @@ with tempfile.TemporaryDirectory() as temp:
     finally:
         client.terminate()
         client.wait(timeout=5)
+    wrapped = wait_for_usage(0, 0)
     # Use Linux WireGuard to exercise the same .conf that the official apps import.
     conf = Path(temp) / 'phone.conf'
     conf.write_bytes(plain)
@@ -67,5 +79,11 @@ with tempfile.TemporaryDirectory() as temp:
                              'http://198.18.1.1:35801/probe'], check=True)
     finally:
         subprocess.run(['ip', 'netns', 'del', namespace], check=True)
+direct = wait_for_usage(wrapped['up'], wrapped['down'])
+assert api('GET', '/api/wireguard/phone/sing-box-qr').startswith(b'\x89PNG')
+subprocess.run(['systemctl', 'restart', 'outline-admin'], check=True)
+time.sleep(1)
+reported = json.loads(api('GET', '/api/wireguard'))
+assert reported['down'] >= direct['down']
 api('DELETE', '/api/wireguard/phone')
-assert json.loads(api('GET', '/api/wireguard'))['devices'] == []
+assert 'phone' not in json.loads(api('GET', '/api/wireguard'))['devices']

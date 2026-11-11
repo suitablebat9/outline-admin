@@ -2,6 +2,8 @@
 import base64
 import contextlib
 import fcntl
+import hashlib
+import hmac
 import ipaddress
 import json
 import os
@@ -59,6 +61,14 @@ def endpoint(private, address, peers):
                 private_key=private, peers=peers)
 
 
+def traffic_tag(device):
+    return 'device-' + hashlib.sha256(device['public'].encode()).hexdigest()[:32]
+
+
+def stats_secret(data):
+    return hmac.new(data['server']['private'].encode(), b'dashboard-usage-v1', hashlib.sha256).hexdigest()
+
+
 def server(data):
     devices = data['devices']
     peers = [dict(public_key=d['public'], allowed_ips=addresses(d['address'])) for d in devices.values()]
@@ -74,7 +84,13 @@ def server(data):
         dict(inbound='relay', action='reject'),
         dict(inbound='wg', ip_is_private=True, action='reject'),
     ]
-    return dict(log={'level': 'warn'}, inbounds=inbounds, endpoints=[wg], outbounds=[dict(type='direct', tag='internet')],
+    outbounds = [dict(type='direct', tag='internet')]
+    for device in devices.values():
+        tag = traffic_tag(device)
+        outbounds.append(dict(type='direct', tag=tag))
+        rules.append(dict(inbound='wg', source_ip_cidr=addresses(device['address']), action='route', outbound=tag))
+    services = [dict(type='api', listen='127.0.0.1', listen_port=18971, secret=stats_secret(data), dashboard=False)]
+    return dict(log={'level': 'warn'}, inbounds=inbounds, endpoints=[wg], services=services, outbounds=outbounds,
                 route=dict(rules=rules, final='internet'))
 
 
