@@ -4,6 +4,8 @@ A self-hosted dashboard for managing an Outline Shadowsocks-over-WebSockets serv
 
 **Bring your own domain, server, and email account.** Hostnames, passwords, access keys, and generated profiles are created on your server and are not part of this repository. This is an independent project, not an official Outline product.
 
+For an iPhone or Mac that connects through built-in VPN settings, see the [native IKEv2 gateway setup](native/README.md).
+
 ## Features
 
 - Dark, responsive dashboard with two-second updates and manual refresh.
