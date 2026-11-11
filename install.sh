@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $EUID -ne 0 ]]; then
-  echo 'Run this installer as root inside the Outline LXC.' >&2
+  echo 'Run this installer as root inside the VPN guest.' >&2
   exit 1
 fi
 
@@ -85,7 +85,7 @@ for url in ['http://127.0.0.1:18083/api/session']:
             break
         except Exception:
             if attempt==14:
-                raise SystemExit('Service startup check failed. Run journalctl -u outline-admin -u outline-ws -n 60')
+                raise SystemExit('Service startup check failed. Run journalctl -u outline-admin -n 60')
             time.sleep(1)
 print('Services are responding.')
 PY

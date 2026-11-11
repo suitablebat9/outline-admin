@@ -9,8 +9,8 @@ fi
 command -v curl >/dev/null || { echo 'Install curl first: apt-get update && apt-get install -y curl'; exit 1; }
 
 
-outline_release='v0.5.0'
-outline_repository="${OUTLINE_ADMIN_REPOSITORY:-suitablebat9/outline-admin}"
+outline_release='v0.5.1'
+outline_repository="${OUTLINE_ADMIN_REPOSITORY:-suitablebat9/wireguard-singbox-dashboard}"
 outline_download="$(mktemp -d)"
 trap 'rm -rf "$outline_download"' EXIT
 curl --fail --show-error --silent --location --retry 3 \

@@ -12,3 +12,14 @@ users.json
 *.tar.gz
 *.log
 .DS_Store
+
+# Local gateway state and exported device credentials
+devices.json
+cloudflare.ini
+*.conf
+*.pem
+*.key
+*.mobileconfig
+*.bpf
+*.json
+*.png
