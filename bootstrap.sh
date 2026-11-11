@@ -9,7 +9,7 @@ fi
 command -v curl >/dev/null || { echo 'Install curl first: apt-get update && apt-get install -y curl'; exit 1; }
 
 
-outline_release='v0.4.0'
+outline_release='v0.4.1'
 outline_repository="${OUTLINE_ADMIN_REPOSITORY:-suitablebat9/outline-admin}"
 outline_download="$(mktemp -d)"
 trap 'rm -rf "$outline_download"' EXIT

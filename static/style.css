@@ -13,3 +13,5 @@ main{margin-left:230px;width:calc(100% - 230px);max-width:1800px;padding:44px 42
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 .person-name{display:block;background:none;border:0;padding:0;color:var(--ink);font-size:12px;font-weight:650;text-align:left}.person-name:hover{color:var(--green);text-decoration:underline;text-underline-offset:3px}.share-actions{display:flex;gap:10px;flex-wrap:wrap}#email-form{border-top:1px solid var(--line);margin-top:22px;padding-top:2px}#share-status{line-height:1.7}#key-dialog{max-height:calc(100dvh - 40px);overflow-y:auto}
+
+#wg-qr-image { width: min(100%, 65vh); height: auto; image-rendering: pixelated; }

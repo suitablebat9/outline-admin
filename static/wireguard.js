@@ -15,6 +15,15 @@ async function wireguardDevices() {
         link.download = name + '.' + extension;
         downloads.append(link, document.createTextNode(' '));
       }
+      const scan = el('button', 'Show sing-box QR', 'text-button');
+      scan.onclick = () => {
+        $('#wg-qr-title').textContent = 'Scan profile for ' + name;
+        $('#wg-qr-status').textContent = 'Loading QR code…';
+        $('#wg-qr-image').hidden = true;
+        $('#wg-qr').showModal();
+        $('#wg-qr-image').src = url + '/sing-box-qr';
+      };
+      downloads.append(scan);
       const actions = el('td');
       const remove = el('button', 'Revoke', 'revoke');
       remove.onclick = async () => {
@@ -41,4 +50,17 @@ $('#wg-add').addEventListener('submit', async event => {
     await wireguardDevices();
   } catch (error) { toast(error.message); }
   finally { button.disabled = false; }
+});
+
+const qrImage = $('#wg-qr-image');
+qrImage.onload = () => {
+  qrImage.hidden = false;
+  $('#wg-qr-status').textContent = 'In sing-box MT, choose Scan QR Code and confirm the import.';
+};
+qrImage.onerror = () => {
+  $('#wg-qr-status').textContent = 'Could not load the QR code. Refresh the dashboard and try again.';
+};
+$('#wg-qr').addEventListener('close', () => {
+  qrImage.hidden = true;
+  qrImage.removeAttribute('src');
 });

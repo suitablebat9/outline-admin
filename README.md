@@ -33,7 +33,7 @@ The installer can create a new Outline WebSocket server or reuse the existing in
 Run **as root inside the server/LXC**, not on the Proxmox host:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.0/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.1/bootstrap.sh | bash
 ```
 
 The installer asks for your VPN hostname, admin hostname, and admin password. On upgrades it preserves saved settings, access keys, email credentials, and traffic history. Outline restarts briefly during installation.
@@ -177,9 +177,11 @@ Tests use temporary files, example domains, and mocked SMTP; they never send rea
 Run the following inside the dashboard guest as root. The installer upgrades the dashboard, installs a checksum-verified sing-box gateway and asks for the public IPv4 address clients can reach. It supports amd64 and arm64 Debian/Ubuntu guests using systemd. The gateway uses userspace WireGuard and needs no additional Proxmox kernel module. The dashboard upgrade briefly restarts Outline.
 
 ```bash
-curl -fsSLo /tmp/install-wg.sh https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.0/wireguard/install.sh && bash /tmp/install-wg.sh
+curl -fsSLo /tmp/install-wg.sh https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.4.1/wireguard/install.sh && bash /tmp/install-wg.sh
 ```
 
 Forward the chosen TCP port (default 443) to the same TCP port on the guest for WireGuard over Shadowsocks. Forward UDP 51820 to the guest only if you also want direct connections. Allow the respective ports through any guest and Proxmox firewalls. Profiles use the entered IPv4 address directly. If it changes, update the host field in the root-only devices.json and download the profiles again.
 
 Open **WireGuard devices**, create one entry per device, and download its private profile. Import the JSON into [sing-box for Apple platforms](https://sing-box.sagernet.org/clients/apple/) for WireGuard over Shadowsocks over TCP. Import the conf file into the [official WireGuard app](https://www.wireguard.com/install/) for direct UDP. Use one VPN at a time. Revoking the device invalidates both credentials. Changes briefly reconnect other WireGuard devices. The WireGuard gateway provides IPv4 internet access, and the profiles request both default routes. The dashboard’s historical traffic chart covers Outline.
+
+For iPhone setup, click **Show sing-box QR** beside the device. In sing-box MT, choose **Scan QR Code** and confirm the import. The code contains the complete private profile and is generated locally by the dashboard.

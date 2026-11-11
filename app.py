@@ -19,6 +19,7 @@ import metrics
 import mailer
 import native_accounts
 import wg_accounts
+from profile_qr import singbox_qr
 
 
 def create_app(settings=None):
@@ -163,6 +164,16 @@ def create_app(settings=None):
         wg_accounts.change(name, remove=True)
         audit('Revoked WireGuard device', name)
         return jsonify(ok=True)
+
+    @app.get('/api/wireguard/<name>/sing-box-qr')
+    @authenticated
+    def wireguard_singbox_qr(name):
+        data = wg_accounts.read()
+        if name not in data['devices']:
+            return jsonify(error='Unknown device.'), 404
+        image = singbox_qr(name, wg_accounts.profile(data, name, wrapped=True))
+        audit('Viewed sing-box QR code', name)
+        return app.response_class(image, mimetype='image/png')
 
     @app.get('/api/wireguard/<name>/<kind>')
     @authenticated

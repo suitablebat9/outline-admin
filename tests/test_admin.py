@@ -151,6 +151,20 @@ class ApiTests(Fixture):
         bad=self.headers();bad['Origin']='https://evil.example'
         self.assertEqual(self.client.post('/api/users',json={'name':'alice'},headers=bad).status_code,403)
 
+    def test_private_singbox_qr(self):
+        path = '/api/wireguard/phone/sing-box-qr'
+        self.assertEqual(self.client.get(path).status_code, 401)
+        self.login()
+        with patch('wg_accounts.read', return_value={'devices': {'phone': {}}}), \
+                patch('wg_accounts.profile', return_value='{"log":{"level":"warn"}}') as profile:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'image/png')
+            self.assertTrue(response.data.startswith(b'\x89PNG'))
+            self.assertTrue(response.cache_control.no_store)
+            self.assertEqual(self.client.get(path.replace('phone', 'removed')).status_code, 404)
+            profile.assert_called_once_with({'devices': {'phone': {}}}, 'phone', wrapped=True)
+
     def test_user_lifecycle_and_no_secrets_in_dashboard(self):
         self.login()
         response=self.client.post('/api/users',json={'name':'alice'},headers=self.headers())
