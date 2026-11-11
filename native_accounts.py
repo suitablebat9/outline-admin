@@ -67,8 +67,10 @@ def gateway():
 def sessions(client):
     for entry in client.list_sas({'ike': 'apple'}):
         for sa in entry.values():
-            if sa.get('state') == b'ESTABLISHED' and sa.get('remote-eap-id'):
-                yield sa['remote-eap-id'].decode(), sa
+            # charon omits remote-eap-id when it equals the IKE identity.
+            owner = sa.get('remote-eap-id', sa.get('remote-id'))
+            if sa.get('state') == b'ESTABLISHED' and owner:
+                yield owner.decode(errors='replace'), sa
 
 
 def listing():
