@@ -18,6 +18,7 @@ from manager import Manager
 import metrics
 import mailer
 import native_accounts
+import wg_accounts
 
 
 def create_app(settings=None):
@@ -139,6 +140,40 @@ def create_app(settings=None):
             total=db.execute('SELECT COALESCE(SUM(upload),0),COALESCE(SUM(download),0) FROM totals').fetchone()
         return jsonify(users=users,healthy=healthy,last_ok=last_ok,started=float(meta['started']),
                        total_upload=total[0],total_download=total[1],history=history,events=events)
+
+    @app.get('/api/wireguard')
+    @authenticated
+    def wireguard_list():
+        if not wg_accounts.STATE.exists():
+            return jsonify(installed=False, devices=[])
+        return jsonify(installed=True, devices=sorted(wg_accounts.read()['devices']))
+
+    @app.post('/api/wireguard')
+    @authenticated
+    def wireguard_add():
+        data = request.get_json(silent=True)
+        name = data.get('name') if isinstance(data, dict) else None
+        wg_accounts.change(name)
+        audit('Created WireGuard device', name)
+        return jsonify(ok=True), 201
+
+    @app.delete('/api/wireguard/<name>')
+    @authenticated
+    def wireguard_remove(name):
+        wg_accounts.change(name, remove=True)
+        audit('Revoked WireGuard device', name)
+        return jsonify(ok=True)
+
+    @app.get('/api/wireguard/<name>/<kind>')
+    @authenticated
+    def wireguard_download(name, kind):
+        data = wg_accounts.read()
+        if name not in data['devices'] or kind not in {'conf', 'json'}:
+            return jsonify(error='Unknown device or profile.'), 404
+        audit('Downloaded WireGuard profile', name)
+        response = app.response_class(wg_accounts.profile(data, name, kind == 'json'), mimetype='application/octet-stream')
+        response.headers.set('Content-Disposition', 'attachment', filename=f'{name}.{kind}')
+        return response
 
     @app.get('/api/native')
     @authenticated

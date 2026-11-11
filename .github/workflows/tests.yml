@@ -42,3 +42,10 @@ jobs:
             sleep 1
           done
           docker exec vpn bash native/smoke-test.sh
+  wireguard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --check static/wireguard.js
+      - run: sudo bash wireguard/smoke.sh

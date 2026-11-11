@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/sharing.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/wireguard.js" defer></script>
   <script src="/static/native.js" defer></script>
 </head>
 <body>
@@ -43,6 +44,12 @@
     <div class="table-wrap"><table><thead><tr><th>Person</th><th>Activity</th><th>Download</th><th>Upload</th><th>Today</th><th>Last activity</th><th class="right">Manage</th></tr></thead><tbody id="users"></tbody></table></div>
     <div id="empty" class="empty" hidden><strong>Your network starts here.</strong><p>Create an access key to invite your first person.</p></div>
     <div class="table-note">Activity reflects observed tunnels, not the app’s connection switch. Shared keys cannot distinguish people or devices.</div></section>
+    <details class="panel" id="wg-panel"><summary>WireGuard devices</summary>
+      <p id="wg-status" class="muted" role="status"></p>
+      <form id="wg-add" hidden><label>Device name<input name="name" required maxlength="15" placeholder="e.g. alice-iphone"></label>
+        <button class="primary" type="submit">Create device</button></form>
+      <div class="table-wrap"><table><thead><tr><th>Device</th><th>Download private profile</th><th>Manage</th></tr></thead><tbody id="wg-devices"></tbody></table></div>
+    </details>
     <details class="panel" id="native-panel"><summary>Apple VPN accounts (IKEv2)</summary>
       <p id="native-status" class="muted" role="status"></p>
       <form id="native-add" hidden><label>VPN username<input name="name" maxlength="64" pattern="[A-Za-z0-9_\-]+" required></label>

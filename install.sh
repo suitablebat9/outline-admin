@@ -96,7 +96,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=-/etc/swanctl/conf.d /etc/outline-ws /var/lib/outline-ws/keys /var/lib/outline-admin /run/lock
+ReadWritePaths=-/etc/outline-wireguard -/etc/swanctl/conf.d /etc/outline-ws /var/lib/outline-ws/keys /var/lib/outline-admin /run/lock
 
 [Install]
 WantedBy=multi-user.target
