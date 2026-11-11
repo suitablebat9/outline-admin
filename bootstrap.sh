@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [[ $EUID -ne 0 ]]; then
-  echo 'Run this command as root inside your Debian/Ubuntu Outline LXC.' >&2
+  echo 'Run this command as root inside your Debian/Ubuntu VPN guest.' >&2
   exit 1
 fi
 command -v curl >/dev/null || { echo 'Install curl first: apt-get update && apt-get install -y curl'; exit 1; }

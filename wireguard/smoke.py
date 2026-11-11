@@ -39,6 +39,10 @@ csrf = json.loads(api('POST', '/api/login', {'username':'admin', 'password':'ci-
 api('POST', '/api/wireguard', {'name':'phone'})
 assert 'phone' in json.loads(api('GET', '/api/wireguard'))['devices']
 plain = api('GET', '/api/wireguard/phone/conf')
+api('PATCH', '/api/wireguard/phone', {'owner':'Alex'})
+assigned = json.loads(api('GET', '/api/wireguard'))['rows']
+assert next(row for row in assigned if row['name'] == 'phone')['owner'] == 'Alex'
+assert api('GET', '/api/wireguard/phone/conf') == plain
 profile = json.loads(api('GET', '/api/wireguard/phone/json'))
 binary = '/usr/local/lib/outline-wireguard/sing-box'
 with tempfile.TemporaryDirectory() as temp:
