@@ -20,6 +20,7 @@ jobs:
       - run: node --test tests/sharing.test.cjs
   native:
     runs-on: ubuntu-24.04
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - run: sudo bash native/smoke-test.sh

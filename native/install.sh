@@ -24,6 +24,12 @@ else
     echo "$host" > "$state/hostname"
 fi
 
+users=/etc/swanctl/conf.d/apple-users.conf
+if [[ ! -s $users ]]; then
+    read -rp 'Choose your VPN username: ' username </dev/tty
+    [[ $username =~ ^[a-zA-Z0-9_-]{1,64}$ ]] || die "Use letters, numbers, dashes or underscores."
+fi
+
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y charon-systemd strongswan-swanctl libcharon-extra-plugins libstrongswan-extra-plugins certbot python3-certbot-dns-cloudflare iptables openssl
 if [[ ! -s $state/cloudflare.ini ]]; then
@@ -90,10 +96,7 @@ pools {
   }
 }
 CONF
-users=/etc/swanctl/conf.d/apple-users.conf
 if [[ ! -s $users ]]; then
-    read -rp 'Choose your VPN username: ' username </dev/tty
-    [[ $username =~ ^[a-zA-Z0-9_-]{1,64}$ ]] || die "Use letters, numbers, dashes or underscores."
     password=$(openssl rand -hex 18)
     printf 'secrets {\n  eap-apple {\n    id = %s\n    secret = "%s"\n  }\n}\n' "$username" "$password" > "$users.tmp"
     mv "$users.tmp" "$users"
