@@ -118,9 +118,17 @@ def create_app(settings=None):
         data = request.get_json(silent=True)
         name = data.get('name') if isinstance(data, dict) else None
         snapshot_before_restart()
-        wg_accounts.change(name)
+        wg_accounts.change(name, owner=data.get('owner', '') if isinstance(data, dict) else '')
         audit('Created WireGuard device', name)
         return jsonify(ok=True), 201
+
+    @app.patch('/api/wireguard/<name>')
+    @authenticated
+    def wireguard_owner(name):
+        data = request.get_json(silent=True)
+        wg_accounts.set_owner(name, data.get('owner') if isinstance(data, dict) else None)
+        audit('Changed device owner', name)
+        return jsonify(ok=True)
 
     @app.delete('/api/wireguard/<name>')
     @authenticated

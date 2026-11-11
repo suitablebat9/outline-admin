@@ -20,15 +20,16 @@
       <div class="legend"><i></i>Download <i></i>Upload</div></section>
     <section class="panel totals"><h2>Recorded usage</h2><dl><div><dt>↓ Download</dt><dd id="down">—</dd></div><div><dt>↑ Upload</dt><dd id="up">—</dd></div></dl></section>
   </div>
-  <section class="panel devices"><div class="panel-title"><h2>Devices <span id="count">0</span></h2><label class="search"><span class="sr-only">Search devices</span><input id="search" type="search" placeholder="Search devices"></label></div>
-  <div class="scroll"><table><thead><tr><th>Device</th><th>Download</th><th>Upload</th><th>Today</th><th><span class="sr-only">Profiles and access</span></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <section class="panel devices"><div class="panel-title"><div class="tabs" aria-label="Usage grouping"><button id="by-device" aria-pressed="true">Devices</button><button id="by-user" aria-pressed="false">Users</button></div><label class="search"><span class="sr-only">Search names</span><input id="search" type="search" placeholder="Search names"></label></div>
+  <div class="scroll"><table><thead><tr><th id="name-column">Device</th><th>Download</th><th>Upload</th><th>Today</th><th><span class="sr-only">Profiles and access</span></th></tr></thead><tbody id="rows"></tbody></table></div>
   <p id="empty" class="empty" hidden></p>
   <div class="footnote">Usage is recorded per device. Recent activity means traffic was observed in the last 30 seconds.</div></section>
   <p id="notice" role="status"></p>
 </main>
 <dialog id="add"><form id="add-form"><div class="panel-title"><h2>Add device</h2><button type="button" class="close" aria-label="Close">×</button></div>
-<label>Device name<input name="name" maxlength="15" required placeholder="e.g. alex-iphone" autocomplete="off"></label><p>Use one profile per device. Adding a device briefly reconnects the gateway.</p><p class="err" role="alert"></p><button class="primary">Create device</button></form></dialog>
+<label>Device name<input name="name" maxlength="15" required placeholder="e.g. alex-iphone" autocomplete="off"></label><label>User (optional)<input name="owner" maxlength="64" placeholder="e.g. Alex"></label><p>Use one profile per device. Adding a device briefly reconnects the gateway.</p><p class="err" role="alert"></p><button class="primary">Create device</button></form></dialog>
 <dialog id="profile"><div class="panel-title"><h2 id="profile-title">Device profile</h2><button class="close" aria-label="Close">×</button></div>
+<form id="owner-form" class="owner-form"><label>User<input name="owner" maxlength="64"></label><button>Save user</button></form>
 <p>In sing-box MT, choose <strong>Scan QR Code</strong> and scan this private profile.</p><img id="qr" alt="Private sing-box profile QR code" hidden><p id="qr-status" role="status"></p>
 <div class="downloads"><a id="json" download>Download sing-box JSON ↓</a><a id="conf" download>Download WireGuard config ↓</a></div>
 <button id="remove" class="danger">Revoke device</button></dialog>

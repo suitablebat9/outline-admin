@@ -126,7 +126,24 @@ def locked():
         yield
 
 
-def change(name, remove=False):
+def owner_label(value):
+    if not isinstance(value, str) or len(value.strip()) > 64 or any(ord(c) < 32 for c in value):
+        raise ValueError('Enter a user name of up to 64 characters.')
+    return value.strip()
+
+
+def set_owner(name, value):
+    label = owner_label(value)
+    with locked():
+        data = read()
+        if name not in data['devices']:
+            raise ValueError('Unknown device.')
+        data['devices'][name]['owner'] = label
+        write(STATE, data)
+
+
+def change(name, remove=False, owner=''):
+    owner = owner_label(owner)
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,15}', name):
         raise ValueError('Use 1–15 letters, numbers, underscores or dashes for the device name.')
     with locked():
@@ -144,7 +161,7 @@ def change(name, remove=False):
             address = next((f'10.248.199.{i}/32' for i in range(2,255) if f'10.248.199.{i}/32' not in used), None)
             if not address:
                 raise ValueError('This gateway is full.')
-            devices[name] = dict(**keypair(), address=address, relay=secret())
+            devices[name] = dict(**keypair(), address=address, relay=secret(), owner=owner)
         write(STATE, data)
         try:
             subprocess.run(['systemctl', 'restart', SERVICE], check=True, timeout=40)

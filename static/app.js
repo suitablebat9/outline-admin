@@ -1,7 +1,7 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 let csrf = $('meta[name="csrf-token"]').content;
-let latest, currentDevice, loading = false, signature = '';
+let latest, currentDevice, loading = false, signature = '', byUser = false;
 const bytes = number => {
   if (!number) return '0 B';
   const units = ['B','KiB','MiB','GiB','TiB','PiB'];
@@ -30,6 +30,7 @@ async function api(url, method='GET', body) {
 }
 function openProfile(name) {
   currentDevice = name;
+  $('#owner-form').elements.owner.value = latest?.rows?.find(d=>d.name===name)?.owner || name;
   const url = '/api/wireguard/' + encodeURIComponent(name);
   $('#profile-title').textContent = name;
   $('#conf').href = url + '/conf'; $('#json').href = url + '/json';
@@ -42,11 +43,25 @@ function render() {
   const live = latest.sampled && now-latest.sampled < 8;
   $('#status').classList.toggle('live', Boolean(live));
   $('#status').textContent = live ? 'Gateway online · updates every 2 seconds' : 'Live stats unavailable · showing recorded totals';
-  $('#count').textContent = latest.devices.length;
+  $('#name-column').textContent = byUser ? 'User' : 'Device';
   $('#down').textContent = bytes(latest.down); $('#up').textContent = bytes(latest.up);
-  const rows = (latest.rows || []).filter(d => d.name.toLowerCase().includes($('#search').value.trim().toLowerCase()));
+  let entries = latest.rows || [];
+  if (byUser) {
+    const people = new Map();
+    for (const device of entries) {
+      const id = device.owner.toLowerCase();
+      const person = people.get(id) || {name:device.owner, up:0, down:0, today:0, seen:0, devices:[]};
+      for (const field of ['up','down','today']) person[field] += device[field];
+      person.seen = Math.max(person.seen, device.seen || 0);
+      person.devices.push(device.name);
+      people.set(id,person);
+    }
+    entries = [...people.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  }
+  const term = $('#search').value.trim().toLowerCase();
+  const rows = entries.filter(d => [d.name,d.owner,...(d.devices||[])].some(v=>v?.toLowerCase().includes(term)));
   const view = rows.map(d => ({...d, recent:live && d.seen && now-d.seen<30}));
-  const next = JSON.stringify([view,live,latest.days,Math.floor(now/86400)]);
+  const next = JSON.stringify([byUser,view,live,latest.days,Math.floor(now/86400)]);
   if (next === signature) return;
   signature = next;
   $('#rows').replaceChildren(...view.map(d => {
@@ -55,9 +70,13 @@ function render() {
     const activity=element('small', d.recent ? 'Active recently' : last);
     activity.className='activity' + (d.recent ? ' active' : '');
     person.append(element('strong',d.name),activity);
+    if (!byUser && d.owner!==d.name) person.append(element('small', d.owner));
+
     const action=element('td',''), button=element('button','Profile');
     button.setAttribute('aria-label','Profile for ' + d.name); button.onclick=()=>openProfile(d.name);
-    action.append(button); row.append(person,element('td',bytes(d.down)),element('td',bytes(d.up)),element('td',bytes(d.today)),action);
+    if (byUser) action.textContent = d.devices.join(', ');
+    else action.append(button);
+    row.append(person,element('td',bytes(d.down)),element('td',bytes(d.up)),element('td',bytes(d.today)),action);
     return row;
   }));
   $('#empty').hidden = rows.length > 0;
@@ -90,6 +109,16 @@ async function refresh() {
   finally {loading=false;}
 }
 $('#search').oninput=render;
+for (const [id, grouped] of [['#by-device',false],['#by-user',true]]) {
+  $(id).onclick=()=>{byUser=grouped;$('#by-user').setAttribute('aria-pressed',String(grouped));
+    $('#by-device').setAttribute('aria-pressed',String(!grouped));render();};
+}
+$('#owner-form').onsubmit=async event=>{
+  event.preventDefault();
+  try {await api('/api/wireguard/'+encodeURIComponent(currentDevice),'PATCH',{owner:event.currentTarget.elements.owner.value});
+    await refresh(); $('#qr-status').textContent='User saved.';}
+  catch(error){$('#qr-status').textContent=error.message;}
+};
 $('#new').onclick=()=>{ $('#add-form').reset(); $('.err').textContent=''; $('#add').showModal(); };
 document.querySelectorAll('.close').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $('#qr').onload=()=>{$('#qr').hidden=false;$('#qr-status').textContent='';};
@@ -97,7 +126,7 @@ $('#qr').onerror=()=>{$('#qr-status').textContent='QR unavailable. Download the 
 $('#profile').onclose=()=>{$('#qr').removeAttribute('src');currentDevice=null;};
 $('#add-form').onsubmit=async e=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('.primary');button.disabled=true;
-  try {const name=form.elements.name.value.trim();await api('/api/wireguard','POST',{name});$('#add').close();await refresh();openProfile(name);}
+  try {const name=form.elements.name.value.trim();await api('/api/wireguard','POST',{name, owner:form.elements.owner.value});$('#add').close();await refresh();openProfile(name);}
   catch(error){$('.err').textContent=error.message;}finally{button.disabled=false;}
 };
 $('#remove').onclick=async()=>{

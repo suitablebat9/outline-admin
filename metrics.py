@@ -107,7 +107,7 @@ def summary(path, devices):
         tag = wg_accounts.traffic_tag(device)
         row = totals.get(tag)
         daily = today.get(tag)
-        rows.append(dict(name=name, up=row['up'] if row else 0, down=row['down'] if row else 0,
+        rows.append(dict(name=name, owner=device.get('owner') or name, up=row['up'] if row else 0, down=row['down'] if row else 0,
                          seen=row['seen'] if row else None, today=daily['up']+daily['down'] if daily else 0))
     return dict(rows=rows, days=days, sampled=stamp['at'] if stamp else None,
                 up=sum(r['up'] for r in totals.values()), down=sum(r['down'] for r in totals.values()))
