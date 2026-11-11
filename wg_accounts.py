@@ -49,14 +49,19 @@ def initialize(address, tcp):
     write(STATE, dict(host=address, tcp=tcp, udp=51820, relay=secret(), server=keypair(), devices={}))
 
 
+def addresses(ipv4):
+    host = int(ipaddress.ip_interface(ipv4).ip) & 255
+    return [ipv4, f'fd94:ac7e:0199::{host:x}/128']
+
+
 def endpoint(private, address, peers):
-    return dict(type='wireguard', tag='wg', system=False, mtu=1280, address=[address],
+    return dict(type='wireguard', tag='wg', system=False, mtu=1280, address=addresses(address),
                 private_key=private, peers=peers)
 
 
 def server(data):
     devices = data['devices']
-    peers = [dict(public_key=d['public'], allowed_ips=[d['address']]) for d in devices.values()]
+    peers = [dict(public_key=d['public'], allowed_ips=addresses(d['address'])) for d in devices.values()]
     wg = endpoint(data['server']['private'], '10.248.199.1/24', peers)
     wg['listen_port'] = data['udp']
     inbounds = []
@@ -77,7 +82,7 @@ def profile(data, name, wrapped):
     device = data['devices'][name]
     key = data['server']['public']
     if not wrapped:
-        return (f"[Interface]\nPrivateKey = {device['private']}\nAddress = {device['address']}\n"
+        return (f"[Interface]\nPrivateKey = {device['private']}\nAddress = {', '.join(addresses(device['address']))}\n"
                 f"DNS = 1.1.1.1\nMTU = 1280\n\n[Peer]\nPublicKey = {key}\n"
                 f"Endpoint = {data['host']}:{data['udp']}\nAllowedIPs = 0.0.0.0/0, ::/0\nPersistentKeepalive = 25\n")
     peer = dict(public_key=key, address='127.0.0.1', port=data['udp'], allowed_ips=['0.0.0.0/0','::/0'],
