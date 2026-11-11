@@ -16,11 +16,13 @@ On upgrade, existing device keys, admin login and port settings are reused. The 
 
 ## Connect a Mac with sing-box
 
-SFM is the standalone sing-box client for macOS 13 or later. If SFM is already in Applications, open it. With Homebrew, you can install it from Terminal:
+Run this command in **Mac Terminal** on macOS 13 or later. The script opens a compatible SFM installation or installs the official signed universal package. It checks the download against the pinned release SHA-256. All required components come with SFM.
 
 ```bash
-brew install --cask sfm
+curl -fsSLo "$HOME/Downloads/install-sfm.sh" https://raw.githubusercontent.com/suitablebat9/wireguard-singbox-dashboard/mac-sfm-1.14.4/macos/install-sfm.sh && /bin/bash "$HOME/Downloads/install-sfm.sh"
 ```
+
+If you already imported a working profile, select it in SFM and connect. For a new device:
 
 1. Sign in to your dashboard, choose **Add device**, and give the Mac its own entry. If it already has one, click **Profile** on that row.
 2. Click **Download sing-box JSON** and save the private file on the Mac.

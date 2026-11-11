@@ -27,3 +27,12 @@ jobs:
           ref: v0.4.1
           path: previous
       - run: sudo bash wireguard/smoke.sh
+  mac-client:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the signed package and check a second run
+        run: |
+          bash macos/install-sfm.sh --no-open
+          bash macos/install-sfm.sh --no-open | grep 'already installed'
