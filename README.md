@@ -33,7 +33,7 @@ The installer can create a new Outline WebSocket server or reuse the existing in
 Run **as root inside the server/LXC**, not on the Proxmox host:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.2.0/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/suitablebat9/outline-admin/v0.3.0/bootstrap.sh | bash
 ```
 
 The installer asks for your VPN hostname, admin hostname, and admin password. On upgrades it preserves saved settings, access keys, email credentials, and traffic history. Outline restarts briefly during installation.

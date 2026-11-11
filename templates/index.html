@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/sharing.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/native.js" defer></script>
 </head>
 <body>
 {% if preview %}<div class="notice" role="status">LOCAL PREVIEW · Sample data only. This is not connected to your LXC.</div>{% endif %}
@@ -42,6 +43,12 @@
     <div class="table-wrap"><table><thead><tr><th>Person</th><th>Activity</th><th>Download</th><th>Upload</th><th>Today</th><th>Last activity</th><th class="right">Manage</th></tr></thead><tbody id="users"></tbody></table></div>
     <div id="empty" class="empty" hidden><strong>Your network starts here.</strong><p>Create an access key to invite your first person.</p></div>
     <div class="table-note">Activity reflects observed tunnels, not the app’s connection switch. Shared keys cannot distinguish people or devices.</div></section>
+    <details class="panel" id="native-panel"><summary>Apple VPN accounts (IKEv2)</summary>
+      <p id="native-status" class="muted" role="status"></p>
+      <form id="native-add" hidden><label>VPN username<input name="name" maxlength="64" pattern="[A-Za-z0-9_\-]+" required></label>
+        <button class="primary" type="submit">Create VPN account</button></form>
+      <div class="table-wrap"><table><thead><tr><th>Username</th><th>Connected devices</th><th>Session upload</th><th>Session download</th><th>Manage</th></tr></thead><tbody id="native-users"></tbody></table></div>
+    </details>
     <div class="lower-grid"><section class="panel" id="activity"><div class="panel-heading"><div><h2>Admin activity</h2><p>Recent changes to your network</p></div><span>◷</span></div><div id="events" class="events"></div></section>
     <section class="panel about"><p class="eyebrow">ABOUT THESE NUMBERS</p><h2>Useful signals.<br>Honest limits.</h2><p>Usage is recorded from Outline every 2 seconds. TCP bytes can appear only after a connection closes.</p><p>History starts when monitoring is installed. Unsampled traffic around restarts or downtime can be missed. Totals include revoked keys.</p><small id="monitoring-since"></small><small id="updated"></small></section></div>
     <footer><span>OUTLINE ADMIN <b>/</b> NETWORK ADMINISTRATION</span><span>Private by design. Yours to manage.</span></footer>
@@ -50,5 +57,6 @@
 <dialog id="add-dialog"><form id="add-form"><div class="dialog-top"><p class="eyebrow">NEW ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2>Invite someone in.</h2><p class="muted">Create a unique, revocable key for one person.</p><label>Username<input name="name" pattern="[a-z][a-z0-9_-]{0,31}" maxlength="32" placeholder="e.g. alice" required></label><p class="field-note">Lowercase letters, numbers, hyphens and underscores.</p><div class="inline-note">Outline restarts to apply this change. Existing users will briefly reconnect.</div><p class="dialog-error" role="alert"></p><button class="primary" type="submit">Create access key ↗</button></form></dialog>
 <dialog id="key-dialog"><div class="dialog-top"><p class="eyebrow">SHARE PRIVATE ACCESS</p><button class="icon-button close" aria-label="Close">×</button></div><h2 id="key-title">Access key</h2><p class="muted">Email their personal code and setup instructions, with the Mac/iPhone DNS profile attached.</p><textarea id="key-value" readonly rows="4" aria-label="Outline access link"></textarea><div class="share-actions"><button id="copy-key" class="text-button">Copy access code</button><button id="copy-setup" class="text-button">Copy setup message</button></div><form id="email-form"><label>Recipient email<input id="share-email" type="email" autocomplete="off" placeholder="alice@example.com" required></label><button id="send-email" class="primary" type="submit" disabled>Send email with attachment</button><p id="share-status" class="field-note" role="status">Checking email configuration…</p></form><p class="field-note">Keep the access code private. Requires Outline Client 1.15.0 or newer.</p></dialog>
 <dialog id="remove-dialog"><form id="remove-form"><div class="dialog-top"><p class="eyebrow">REVOKE ACCESS</p><button type="button" class="icon-button close" aria-label="Close">×</button></div><h2 id="remove-title">Remove access?</h2><p class="muted">Their key will stop working. Recorded usage remains in network totals.</p><div class="inline-note">Outline will restart, disconnecting current sessions. Other authorized users can reconnect.</div><p class="dialog-error" role="alert"></p><button class="danger" type="submit">Revoke access</button></form></dialog>
+<dialog id="native-secret"><div class="dialog-top"><h2>VPN password</h2><button class="close icon-button" aria-label="Close">×</button></div><label id="native-owner" for="native-value"></label><input id="native-value" readonly></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body></html>

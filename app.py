@@ -17,6 +17,7 @@ from werkzeug.security import check_password_hash
 from manager import Manager
 import metrics
 import mailer
+import native_accounts
 
 
 def create_app(settings=None):
@@ -138,6 +139,36 @@ def create_app(settings=None):
             total=db.execute('SELECT COALESCE(SUM(upload),0),COALESCE(SUM(download),0) FROM totals').fetchone()
         return jsonify(users=users,healthy=healthy,last_ok=last_ok,started=float(meta['started']),
                        total_upload=total[0],total_download=total[1],history=history,events=events)
+
+    @app.get('/api/native')
+    @authenticated
+    def native_list():
+        return jsonify(native_accounts.listing())
+
+    @app.post('/api/native')
+    @authenticated
+    def native_add():
+        data = request.get_json(silent=True)
+        name = data.get('name') if isinstance(data, dict) else None
+        result = native_accounts.change(name)
+        audit('Created native VPN account', name)
+        return jsonify(result), 201
+
+    @app.get('/api/native/<name>/password')
+    @authenticated
+    def native_password(name):
+        account = native_accounts.load().get(name)
+        if not account:
+            return jsonify(error='Native VPN account not found.'), 404
+        audit('Viewed native VPN password', name)
+        return jsonify(password=account[1])
+
+    @app.delete('/api/native/<name>')
+    @authenticated
+    def native_revoke(name):
+        result = native_accounts.change(name, remove=True)
+        audit('Revoked native VPN account', name)
+        return jsonify(result)
 
     @app.post('/api/users')
     @authenticated

@@ -21,3 +21,25 @@ swanctl --list-conns | grep 'apple:'
 swanctl --list-pools | grep apple4
 swanctl --list-certs | grep "$host"
 systemctl is-active apple-ikev2-network.service
+# Exercise the dashboard's account backend against a live strongSwan daemon.
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
+python3 -m venv "$stub/test-env"
+"$stub/test-env/bin/pip" install -q vici==6.0.3
+"$stub/test-env/bin/python" - <<'PY'
+import subprocess
+import native_accounts as accounts
+assert accounts.listing()['online']
+assert 'appletest' in accounts.load()
+user = accounts.change('native-test')
+section, password = accounts.load()['native-test']
+assert user['password'] == password
+with accounts.gateway() as client:
+    assert section.encode() in client.get_shared()['keys']
+subprocess.run(['systemctl', 'restart', 'strongswan'], check=True)
+with accounts.gateway() as client:
+    assert section.encode() in client.get_shared()['keys']
+accounts.change('native-test', remove=True)
+assert set(accounts.load()) == {'appletest'}
+with accounts.gateway() as client:
+    assert section.encode() not in client.get_shared()['keys']
+PY

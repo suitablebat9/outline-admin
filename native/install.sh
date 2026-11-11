@@ -166,6 +166,8 @@ install -m 644 "/etc/letsencrypt/live/$host/cert.pem" /etc/swanctl/x509/apple-ce
 systemctl enable --now strongswan.service certbot.timer
 RENEWED_LINEAGE="/etc/letsencrypt/live/$host" "$hook"
 swanctl --load-pools
+# Rebuild the dashboard service mount namespace after the credential directory exists.
+if systemctl is-active --quiet outline-admin.service; then systemctl restart outline-admin.service; fi
 swanctl --list-conns | grep -F 'apple:'
 printf '\nType: IKEv2\nServer and Remote ID: %s\nLocal ID: leave blank\nAuthentication: Username\n' "$host"
 awk '/^[[:space:]]*id =/{print "Username: " $3} /secret =/{gsub(/"/,"",$3); print "Password: " $3}' "$users"

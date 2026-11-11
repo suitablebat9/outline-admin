@@ -1,6 +1,6 @@
 # Native VPN for iPhone and Mac
 
-Use a Debian 12 LXC or Ubuntu Server 24.04 guest with systemd and a reserved LAN IPv4 address. An existing Outline container can run this service alongside Outline when it has kernel IPsec and firewall access. Run the installer inside the guest. The native gateway uses strongSwan IKEv2 with individual credentials stored on the guest. Outline keys, dashboard statistics, and email invitations apply to the Outline service only.
+Use a Debian 12 LXC or Ubuntu Server 24.04 guest with systemd and a reserved LAN IPv4 address. An existing Outline container can run this service alongside Outline when it has kernel IPsec and firewall access. Run the installer inside the guest. The native gateway uses strongSwan IKEv2 with individual credentials stored on the guest. In dashboard version 0.3.0 and later, open **Apple VPN accounts (IKEv2)** to create users, view passwords, revoke access, and see connected devices and current session traffic. Historical traffic charts and email invitations cover Outline accounts.
 
 1. In Cloudflare DNS, create a DNS-only A record for a new hostname pointing to your router's public IPv4 address. Keep it updated if your ISP changes your address. A router behind carrier-grade NAT needs an ISP-provided public address or another publicly reachable gateway.
 2. Forward UDP 500 and UDP 4500 from the router to the **same ports on the VPN guest**. Allow both in any Proxmox firewall protecting the guest. The installer uses DNS validation for its Let's Encrypt certificate.
