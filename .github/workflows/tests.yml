@@ -24,3 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo bash native/smoke-test.sh
+  native-debian:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Debian 12 with systemd and a container network
+        run: |
+          docker build -t vpn-bookworm - <<'DOCKER'
+          FROM debian:12
+          RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd iproute2 iptables openssl procps ca-certificates
+          DOCKER
+          docker run -d --name vpn --privileged --cgroupns=private --tmpfs /run --tmpfs /run/lock -e container=docker -v "$PWD:/src:ro" -w /src vpn-bookworm sh -ec 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init'
+          for i in {1..30}; do
+            docker exec vpn test -S /run/systemd/private && break
+            sleep 1
+          done
+          docker exec vpn bash native/smoke-test.sh

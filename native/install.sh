@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
-# Install on a dedicated Ubuntu Server 24.04 VM.
+# Install an IKEv2 endpoint inside a supported Debian or Ubuntu guest.
 set -euo pipefail
 umask 077
 die() { echo "$*" >&2; exit 1; }
-[[ $EUID == 0 ]] || die "Run with sudo on the VPN VM."
+[[ $EUID == 0 ]] || die "Run as root inside the VPN guest."
+[[ ! -d /etc/pve ]] || die "Open the VPN guest console instead of the Proxmox host shell."
 source /etc/os-release
-[[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || die "Use a dedicated Ubuntu Server 24.04 VM."
-if systemd-detect-virt --container --quiet || [[ -d /etc/pve ]]; then
-    die "Run inside the VPN VM, not a container or Proxmox host."
-fi
+case "$ID:$VERSION_ID" in
+    debian:12|ubuntu:24.04) ;;
+    *) die "Supported guests are Debian 12 and Ubuntu 24.04." ;;
+esac
 state=/etc/apple-ikev2
-if [[ ! -d $state && ( -d /etc/swanctl || -f /etc/ipsec.conf ) ]]; then
-    die "An IPsec installation exists. Use a fresh VM."
+if [[ ! -d $state ]]; then
+    [[ ! -d /etc/swanctl && ! -f /etc/ipsec.conf ]] || die "Existing IPsec configuration found. Check the current installation first."
+    listeners=$(ss -H -lun '( sport = :500 or sport = :4500 )')
+    [[ -z $listeners ]] || die "UDP port 500 or 4500 is already in use."
+fi
+if systemd-detect-virt --container --quiet; then
+    ip xfrm policy list >/dev/null || die "The container needs access to kernel IPsec policies."
+    ip xfrm state count >/dev/null || die "The container needs access to kernel IPsec states."
+    [[ $(sysctl -n net.ipv4.ip_forward) == 1 || -w /proc/sys/net/ipv4/ip_forward ]] || die "Enable net.ipv4.ip_forward=1 for this container in Proxmox."
 fi
 install -d -m 700 "$state"
 exec 9>"$state/install.lock"
@@ -60,7 +68,7 @@ swanctl --load-conns
 HOOK
 chmod 700 "$hook"
 install -d /etc/swanctl/{conf.d,private,x509,x509ca}
-grep -Eq '^\s*include\s+conf.d/\*\.conf' /etc/swanctl/swanctl.conf || die "Expected Ubuntu's default swanctl.conf with conf.d enabled."
+grep -Eq '^\s*include\s+conf.d/\*\.conf' /etc/swanctl/swanctl.conf || die "Expected the default swanctl.conf with conf.d enabled."
 cat > /etc/swanctl/conf.d/apple-ikev2.conf <<CONF
 connections {
   apple {
@@ -121,6 +129,11 @@ for subnet in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.0.0/
 done
 rule filter INPUT -s "$pool" -j DROP
 rule nat POSTROUTING -s "$pool" -o "$dev" -m policy --dir out --pol none -j MASQUERADE
+# Keep client IPv6 traffic local to the tunnel without changing guest-wide IPv6 settings.
+for chain in INPUT FORWARD; do
+    ip6tables -w -C "$chain" -s fd79:aead:5300::/120 -j DROP 2>/dev/null ||
+        ip6tables -w -I "$chain" 1 -s fd79:aead:5300::/120 -j DROP
+done
 NET
 chmod 700 /usr/local/sbin/apple-ikev2-network
 cat > /etc/systemd/system/apple-ikev2-network.service <<'UNIT'
@@ -138,15 +151,16 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 UNIT
-cat > /etc/sysctl.d/90-apple-ikev2.conf <<'SYSCTL'
-net.ipv4.ip_forward=1
-net.ipv4.conf.all.send_redirects=0
-net.ipv4.conf.default.send_redirects=0
-net.ipv6.conf.all.forwarding=0
-SYSCTL
-sysctl -p /etc/sysctl.d/90-apple-ikev2.conf
+# Forwarding may already be set by Proxmox on a read-only sysctl mount.
+if [[ $(sysctl -n net.ipv4.ip_forward) != 1 ]]; then
+    sysctl -w net.ipv4.ip_forward=1
+fi
+if [[ -w /proc/sys/net/ipv4/ip_forward ]]; then
+    echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-apple-ikev2.conf
+fi
 systemctl daemon-reload
-systemctl enable --now apple-ikev2-network.service
+systemctl enable apple-ikev2-network.service
+systemctl restart apple-ikev2-network.service
 # Stage the leaf before starting charon, whose service loads connections at startup.
 install -m 644 "/etc/letsencrypt/live/$host/cert.pem" /etc/swanctl/x509/apple-cert.pem
 systemctl enable --now strongswan.service certbot.timer
