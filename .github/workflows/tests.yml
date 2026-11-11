@@ -35,7 +35,7 @@ jobs:
           FROM debian:12
           RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd iproute2 iptables openssl procps ca-certificates
           DOCKER
-          docker run -d --name vpn --privileged --cgroupns=private --tmpfs /run --tmpfs /run/lock -e container=docker -v "$PWD:/src:ro" -w /src vpn-bookworm sh -ec 'mount -o remount,rw /sys/fs/cgroup && exec /sbin/init'
+          docker run -d --name vpn --privileged --cgroupns=private --tmpfs /run --tmpfs /run/lock -e container=docker -v "$PWD:/src:ro" -w /src vpn-bookworm sh -ec 'mount -o remount,rw /sys/fs/cgroup && exec /lib/systemd/systemd'
           for i in {1..30}; do
             docker exec vpn test -S /run/systemd/private && break
             sleep 1
